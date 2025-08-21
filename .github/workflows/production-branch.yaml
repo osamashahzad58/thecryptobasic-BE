@@ -1,0 +1,117 @@
+name: Deploy to AWS ECS Production
+
+on:
+  push:
+    branches: [production]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_ECR_REGION }}
+  ECS_CLUSTER: theCryptoBasic-Cluster
+  ECR_REPOSITORY: theCryptoBasic-prod-be
+  ECS_SERVICE: theCryptoBasic-Prod-BE-Service
+  CONTAINER_NAME: backend
+  TASK_DEFINITION: theCryptoBasic-Prod-BE-td
+
+jobs:
+  deploy:
+    name: Deploying to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Make environment files
+        run: |
+          cat << EOF > .env
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY}}
+            AWS_ACCESS_SECRET=${{ secrets.AWS_ACCESS_SECRET}}
+            AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME}}
+            AWS_S3_BUCKET_REGION=${{ secrets.AWS_S3_BUCKET_REGION}}
+            DATABASE_URI=${{ secrets.DATABASE_URI}}
+            PORT=${{ secrets.PORT}}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL}}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD}}
+            JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET}}
+            JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET}}
+            JWT_PASSWORD_RESET_TOKEN_SECRET=${{ secrets.JWT_PASSWORD_RESET_TOKEN_SECRET}}
+            REDIS_HOST=${{ secrets.REDIS_HOST}}
+            SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY}}
+            SENDGRID_API_KEY_NAME=${{ secrets.SENDGRID_API_KEY_NAME}}
+            SENDGRID_EMAIL_SENDER=${{ secrets.SENDGRID_EMAIL_SENDER}}
+            SENDGRID_EMAIL_SENDER_NAME=${{ secrets.SENDGRID_EMAIL_SENDER_NAME}}
+            SENDGRID_EARLY_USER_TEMPLATE_ID=${{ secrets.SENDGRID_EARLY_USER_TEMPLATE_ID}}
+            SENDGRID_VERIFICATION_EMAIL_TEMPLATE_ID=${{ secrets.SENDGRID_VERIFICATION_EMAIL_TEMPLATE_ID}}
+            GRAPH_URL=${{ secrets.GRAPH_URL}}
+            GRAPH_URLFORDATAREQUEST=${{ secrets.GRAPH_URLFORDATAREQUEST}}
+            GRAPH_URLFORSURVEY=${{ secrets.GRAPH_URLFORSURVEY}}
+            GRAPH_URLFOREXTERNALSOURCE=${{ secrets.GRAPH_URLFOREXTERNALSOURCE}}
+            APIKEY=${{ secrets.APIKEY}}
+            APPID=${{ secrets.APPID}}
+            PRIVATE_KEY=${{ secrets.PRIVATE_KEY}}
+            FIREBASE_SERVICE_ACCOUNT_PATH=${{ secrets.FIREBASE_SERVICE_ACCOUNT_PATH}}
+            SUMSUB_APP_ID=${{ secrets.SUMSUB_APP_ID}}
+            SUMSUB_SECRET_KEY=${{ secrets.SUMSUB_SECRET_KEY}}
+            SUMSUB_BASE_URL=${{ secrets.SUMSUB_BASE_URL}}
+            AWS_ECR_ACCESS_KEY_ID=${{ secrets.AWS_ECR_ACCESS_KEY_ID}}
+            AWS_ECR_SECRET_ACCESS_KEY=${{ secrets.AWS_ECR_SECRET_ACCESS_KEY}}
+            AWS_ECR_REGION=${{ secrets.AWS_ECR_REGION}}
+            SENDGRID_DATA_REQUEST_TEMPLATE_ID=${{ secrets.SENDGRID_DATA_REQUEST_TEMPLATE_ID}}
+            SENDGRID_SURVEY_TEMPLATE_ID=${{ secrets.SENDGRID_SURVEY_TEMPLATE_ID}}
+            SENDGRID_KYC_COMPLETED_TEMPLATE_ID=${{ secrets.SENDGRID_KYC_COMPLETED_TEMPLATE_ID}}
+            SENDGRID_COMPLETED_TEMPLATE_ID=${{ secrets.SENDGRID_COMPLETED_TEMPLATE_ID}}
+            RPC_URL=${{ secrets.RPC_URL}}
+            WALLET_PRIVATE_KEY=${{ secrets.WALLET_PRIVATE_KEY}}
+            GRAPH_URL_REGULAR_DISPUTE=${{ secrets.GRAPH_URL_REGULAR_DISPUTE}}
+            GRAPH_URL_MINI_DISPUTE=${{ secrets.GRAPH_URL_MINI_DISPUTE}}
+            GRAPH_URL_MINI_DISPUTE=${{ secrets.GRAPH_URL_MINI_DISPUTE}}
+            GRAPH_URL_DOP_MINI_DISPUTE=${{ secrets.GRAPH_URL_DOP_MINI_DISPUTE}}
+            GRAPH_URL_DOP_REGULAR_DISPUTE=${{ secrets.GRAPH_URL_DOP_REGULAR_DISPUTE}}
+            SENDGRID_DISPUTE_ASKER_LOSS_TEMPLATE_ID=${{ secrets.SENDGRID_DISPUTE_ASKER_LOSS_TEMPLATE_ID}}
+            SENDGRID_DISPUTE_ASKER_WINNER_TEMPLATE_ID=${{ secrets.SENDGRID_DISPUTE_ASKER_WINNER_TEMPLATE_ID}}
+            SENDGRID_DISPUTE_JURY_TEMPLATE_ID=${{ secrets.SENDGRID_DISPUTE_JURY_TEMPLATE_ID}}
+            
+            
+      - name: Write Firebase credentials to file
+        run: |
+          cat <<EOF > google-services.json
+          ${{ secrets.FIREBASE_CREDENTIALS}}
+                    
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_ECR_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+      - name: Download task definition
+        run: aws ecs describe-task-definition --task-definition ${{ env.TASK_DEFINITION }} --query taskDefinition > ${{ env.TASK_DEFINITION }}.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEFINITION }}.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

@@ -1,0 +1,2254 @@
+openapi: 3.0.0
+info:
+  title: theCryptoBasic
+  description: theCryptoBasic Api Documentation
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8081/
+    description: Local server
+  - url: http://192.168.30.183:8081/
+    description: Local Ip
+  - url: http://54.227.47.166:8081
+    description: Staging
+
+tags:
+  - name: Auth
+    description: Auth Apis
+  - name: User
+    description: User Apis
+
+
+
+paths:
+  /auth/users/signup:
+    post:
+      summary: User Signup
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for user signup
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+                password:
+                  type: string
+                  example: 12345xZ$
+                  description: "must obey to strong password policy (e.g. min 1 lowercase letter, min 1 uppercase letter, min 1 special symbol, min 1 number, no spaces & min length of 8)"
+                  required: true
+      responses:
+        201:
+          description: User signup successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UserSignupSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        409:
+          description: Email/username already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UsernameOrEmailAlreadyExist"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/users/signin:
+    post:
+      summary: Signin
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for  signin
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: shahid@gmail.com
+                password:
+                  type: string
+                  example: 12345xZ$
+                  required: true
+                rememberMe:
+                  type: boolean
+                  example: false
+                  required: true
+      responses:
+        200:
+          description: Admin Signin successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/AdminSigninSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Username/password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/SigninFailure"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/users/refresh-token:
+    post:
+      summary: Refresh token (Generate new access token)
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for refresh token
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTI4NTY5NTksImV4cCI6MTY1Mjk0MzM1OSwiYXVkIjoiNjI3OGZhOGVmMDc3MWMzNDZlYzRiZGVjIiwiaXNzIjoiZXJvY2VycnkuY29tIn0.f1ZcVeN_TP76-OWZfHXNcPqNxoxLMyK8Jk1H8TA5YWY"
+                  required: true
+      responses:
+        200:
+          description: Refresh token success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/RefreshTokenSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/users/logout:
+    delete:
+      summary: Logout signedin user
+      security:
+        - bearerAuth: []
+      tags:
+        - Auth
+      responses:
+        200:
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/LogoutSuccess"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/admins/signin:
+    post:
+      summary: Admin Signin
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for admin signin
+        required:
+          - email
+          - password
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+                password:
+                  type: string
+                  example: 12345xZ$
+                  required: true
+                rememberMe:
+                  type: boolean
+                  example: false
+                  required: true
+      responses:
+        201:
+          description: Admin signin successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/AdminSignInSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Username/password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/SigninFailure"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/admins/refresh-token:
+    post:
+      summary: Refresh token
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for refresh token
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTI4NTY5NTksImV4cCI6MTY1Mjk0MzM1OSwiYXVkIjoiNjI3OGZhOGVmMDc3MWMzNDZlYzRiZGVjIiwiaXNzIjoiZXJvY2VycnkuY29tIn0.f1ZcVeN_TP76-OWZfHXNcPqNxoxLMyK8Jk1H8TA5YWY"
+                  required: true
+      responses:
+        201:
+          description: Refresh token success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/RefreshTokenSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/admins/logout:
+    delete:
+      summary: Logout signedin admin
+      security:
+        - bearerAuth: []
+      tags:
+        - Auth
+      responses:
+        200:
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/LogoutSuccess"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/admins/forget-password:
+    post:
+      summary: Forgot password (password reset request)
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for forgot password
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+      responses:
+        200:
+          description: Forgot password initiation success (Password reset link sent via email)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ForgotPasswordInitiationSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        404:
+          description: Admin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/AdminNotFound"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/admins/reset-password:
+    post:
+      summary: Reset password (password reset request)
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for reset password
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2OTE1OTE2MDUsImV4cCI6MTY5MTU5MzQwNSwiaXNzIjoidG9taWRvcC5jb20ifQ.pl6DKOqsy1ZRRhFvpqgRqEOzHaksok7JTvZioViBbBo
+                  required: true
+                password:
+                  type: string
+                  example: "154785Qwe#"
+                  required: true
+                confirmPassword:
+                  type: string
+                  example: "154785Qwe#"
+                  required: true
+      responses:
+        200:
+          description: Reset Password success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ResetPasswordInitiationSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        404:
+          description: Admin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/AdminNotFound"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/signup:
+    post:
+      summary: Creator Signup
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for creator Signup
+        required:
+          - email
+          - password
+          - walletAddress
+          - confrimPassword
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+                walletAddress:
+                  type: string
+                  example: 0xA3CCBDaC3B59169fBac1872b91c204f6a55226BD
+                  required: true
+                password:
+                  type: string
+                  example: 12345xZ$
+                  required: true
+                confirmPassword:
+                  type: string
+                  example: 12345xZ$
+                  required: true
+      responses:
+        201:
+          description: Creator signup successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/CreatorSignUpSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/signin:
+    post:
+      summary: Creator Signin
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for creator signin
+        required:
+          - email
+          - password
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+                password:
+                  type: string
+                  example: 12345xZ$
+                  required: true
+                rememberMe:
+                  type: boolean
+                  example: false
+                  required: true
+      responses:
+        201:
+          description: Admin signin successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/AdminSignInSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Username/password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/SigninFailure"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/refresh-token:
+    post:
+      summary: Refresh token
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for refresh token
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTI4NTY5NTksImV4cCI6MTY1Mjk0MzM1OSwiYXVkIjoiNjI3OGZhOGVmMDc3MWMzNDZlYzRiZGVjIiwiaXNzIjoiZXJvY2VycnkuY29tIn0.f1ZcVeN_TP76-OWZfHXNcPqNxoxLMyK8Jk1H8TA5YWY"
+                  required: true
+      responses:
+        201:
+          description: Refresh token success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/RefreshTokenSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/logout:
+    delete:
+      summary: Logout signedin admin
+      security:
+        - bearerAuth: []
+      tags:
+        - Auth
+      responses:
+        200:
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/LogoutSuccess"
+        401:
+          description: Unauthorized (JWT Invalid/Expired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/forget-password:
+    post:
+      summary: Forgot password (password reset request)
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for forgot password
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: abc@example.com
+                  required: true
+      responses:
+        200:
+          description: Forgot password initiation success (Password reset link sent via email)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ForgotPasswordInitiationSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        404:
+          description: Creator not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/CreatorNotFound"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/creators/reset-password:
+    post:
+      summary: Reset password (password reset request)
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for reset password
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2OTE1OTE2MDUsImV4cCI6MTY5MTU5MzQwNSwiaXNzIjoidG9taWRvcC5jb20ifQ.pl6DKOqsy1ZRRhFvpqgRqEOzHaksok7JTvZioViBbBo
+                  required: true
+                password:
+                  type: string
+                  example: "154785Qwe#"
+                  required: true
+                confirmPassword:
+                  type: string
+                  example: "154785Qwe#"
+                  required: true
+      responses:
+        200:
+          description: Reset Password success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ResetPasswordInitiationSuccess"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        404:
+          description: Creator not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/CreatorNotFound"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/users/email-verification/create-email-verification-code:
+  /auth/users/register:
+    post:
+      summary: Register user
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for User Registration
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                walletAddress:
+                  type: string
+                  example: "0xA3CCBDaC3B59169fBac1872b91c204f6a55226BD"
+                  required: true
+      responses:
+        200:
+          description: You Have Successfully Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UserRegisterSuccessfuly"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        409:
+          description: User with wallet address already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UserAlreadyExist"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /auth/users/login:
+    post:
+      summary: Login user
+      tags:
+        - Auth
+      requestBody:
+        description: Payload for  User Login
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                walletAddress:
+                  type: string
+                  example: "0xA3CCBDaC3B59169fBac1872b91c204f6a55226BD"
+                  required: true
+                sign:
+                  type: string
+                  example: "0xA3CCBDaC3B5"
+                  required: true
+      responses:
+        200:
+          description: You Have Successfully logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UserLoginSuccessfuly"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: User sign not verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/SignNotVerified"
+        404:
+          description: User not found in Your Squad
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UserNotFound"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+
+  /users/profile:
+    post:
+      summary: Edit user
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      requestBody:
+        description: Payload for Edit User
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  required: false
+                bio:
+                  type: string
+                  required: false
+                twitterUserName:
+                  type: string
+                  required: false
+                instagramLink:
+                  type: string
+                  required: false
+                telegramLink:
+                  type: string
+                  required: false
+                websiteLink:
+                  type: string
+                  required: false
+                discordLink:
+                  type: string
+                  required: false
+                mediumLink:
+                  type: string
+                  required: false
+                email:
+                  type: string
+                  required: false
+                redditLink:
+                  type: string
+                  required: false
+                picture:
+                  type: string
+                  format: binary
+                  required: false
+                coverPicture:
+                  type: string
+                  format: binary
+                  required: false
+      responses:
+        200:
+          description: Edit User Successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/userUpdatedSuccessfuly"
+        400:
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/BadRequest"
+        401:
+          description: UnAuthorized (Access Token expired or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+  /users/get-user-profile:
+    get:
+      summary: Get user Profile
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      responses:
+        200:
+          description: Get User Successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/GetUserSuccessfuly"
+        401:
+          description: UnAuthorized (Access Token expired or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/UnAuthorized"
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/responses/ServerError"
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      in: header
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    AdminSigninSuccess:
+      summary: Admin signin success response
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Signin successfull
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  example: 6278fa8ef0771c346ec4bdec
+                name:
+                  type: string
+                  example: arham321
+                email:
+                  type: string
+                  example: arham321@example.com
+                role:
+                  type: string
+                  example: Admin
+                createdAt:
+                  type: string
+                  example: "2023-07-11T16:49:58.453Z"
+                updatedAt:
+                  type: string
+                  example: "2023-07-11T16:49:58.453Z"
+            accessToken:
+              type: string
+              description: JWT access token
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2Mjc4ZmE4ZWYwNzcxYzM0NmVjNGJkZWMiLCJ1c2VybmFtZSI6ImFrYXNoIiwiZW1haWwiOiJha2FzaHNhYmlyMDA3QGdtYWlsLmNvbSIsImlhdCI6MTY1Mjg1Njk1OSwiZXhwIjoxNjUyODYwNTU5LCJhdWQiOiI2Mjc4ZmE4ZWYwNzcxYzM0NmVjNGJkZWMiLCJpc3MiOiJlcm9jZXJyeS5jb20ifQ.-ExYjI7YaUSsBJOE_bH7ni4ahlFkzHiwVnRhfpAaVlQ"
+            refreshToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTI4NTY5NTksImV4cCI6MTY1Mjk0MzM1OSwiYXVkIjoiNjI3OGZhOGVmMDc3MWMzNDZlYzRiZGVjIiwiaXNzIjoiZXJvY2VycnkuY29tIn0.f1ZcVeN_TP76-OWZfHXNcPqNxoxLMyK8Jk1H8TA5YWY"
+              description: JWT refresh token (used to generate new pair of access & refresh token)
+    # ///////////////////////////////////////// General //////////////////////////////////
+    SigninFailure:
+      summary: Signin Failed (invalid auth credentials)
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 401
+        message:
+          type: string
+          example: Username/Email or Password is incorrect
+        details:
+          type: string
+          example: null
+    UserSignupSuccess:
+      summary: User signup success response
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          description: status code denoting api response
+          example: 201
+        message:
+          type: string
+          description: descriptive message describing response
+          example: Account Is Created Successfully
+    UsernameOrEmailAlreadyExist:
+      summary: Username/Email address already exist
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 409
+        message:
+          type: string
+          example: Username/Email must be unique
+        details:
+          example:
+            type: object
+            properties:
+              reason:
+                type: string
+                example: username
+    BadRequest:
+      summary: Bad Request (Api Payload validation failed)
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Validation Failed
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              "{payload_field}":
+                type: string
+                example: "{payload_field validation error message}"
+    ServerError:
+      summary: Internal Server Error
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 500
+        message:
+          type: string
+          example: Something went wrong
+        details:
+          example: null
+    UnAuthorized:
+      summary: UnAuthorized
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 401
+        message:
+          type: string
+          example: Jwt expired/invalid
+        details:
+          example: null
+
+    # ///////////////////////////////////////// User /////////////////////////////////////
+
+    UserRegisterSuccessfuly:
+      summary: User register successful
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: User added successfully
+        data:
+          type: object
+          properties:
+            walletAddress:
+              type: string
+              example: 0x9439bd955e685665590d17a3863f0594222ce309
+            role:
+              type: string
+              example: user
+            totalRefferal:
+              type: number
+              example: 0
+            status:
+              type: string
+              example: active
+            verified:
+              type: boolean
+            picture:
+              type: string
+              example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/placeholder.png
+            coverPicture:
+              type: string
+              example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/cover-placeholder.png
+            followersCount:
+              type: number
+              example: 0
+            followingCount:
+              type: number
+              example: 0
+            numberOfLikedTokens:
+              type: number
+              example: 0
+            numberOfLikedCollections:
+              type: number
+              example: 0
+            tokenCreated:
+              type: number
+              example: 0
+            tokenSold:
+              type: number
+              example: 0
+            likedImage:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart.png
+            unLikedImage:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart-outline-icon.png
+            Permissions:
+              type: array
+              items:
+            _id:
+              type: string
+              example: 64588affdbf84d6d1aa44933
+            followers:
+              type: array
+              items:
+            following:
+              type: array
+              items:
+            likedTokens:
+              type: array
+              items:
+            likedCollections:
+              type: array
+              items:
+            createdAt:
+              type: string
+              format: date-time
+              example: 2023-05-08T05:39:11.772Z
+            updatedAt:
+              type: string
+              format: date-time
+              example: 2023-05-08T05:39:11.772Z
+            __v:
+              type: number
+              example: 0
+    UserAlreadyExist:
+      summary: Internal Server Error
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 409
+        message:
+          type: string
+          example: User with 0x9439bD955e685665590d17a3863f0594222ce309 already exist
+        details:
+          type: string
+          format: null
+    UserLoginSuccessfuly:
+      summary: User login successful
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: User logged in successfully
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  example: 6454e793c83d5b5f8425be50
+                walletAddress:
+                  type: string
+                  example: 0x81ed33ac3875379ee1a0d4625e2230b1a013e77d
+                role:
+                  type: string
+                  example: user
+                totalRefferal:
+                  type: number
+                  example: 0
+                status:
+                  type: string
+                  example: active
+                verified:
+                  type: boolean
+                picture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/placeholder.png
+                coverPicture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/cover-placeholder.png
+                followersCount:
+                  type: number
+                  example: 0
+                followingCount:
+                  type: number
+                  example: 0
+                numberOfLikedTokens:
+                  type: number
+                  example: 0
+                numberOfLikedCollections:
+                  type: number
+                  example: 0
+                tokenCreated:
+                  type: number
+                  example: 0
+                tokenSold:
+                  type: number
+                  example: 0
+                likedImage:
+                  type: string
+                  example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart.png
+                unLikedImage:
+                  type: string
+                  example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart-outline-icon.png
+                Permissions:
+                  type: array
+                  items:
+                followers:
+                  type: array
+                  items:
+                following:
+                  type: array
+                  items:
+                likedTokens:
+                  type: array
+                  items:
+                likedCollections:
+                  type: array
+                  items:
+                createdAt:
+                  type: string
+                  format: date-time
+                  example: 2023-05-05T11:25:07.257Z
+                updatedAt:
+                  type: string
+                  format: date-time
+                  example: 2023-05-05T11:25:07.257Z
+                __v:
+                  type: number
+                  example: 0
+            token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXlc3MiOiIweDgxRUQzM0FD2U3N2QiLCJpYYXIjoigcS499z18oUi8j7E0
+    SignNotVerified:
+      summary: Sign Not verified
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 401
+        message:
+          type: string
+          example: Sign not verified
+        details:
+          type: string
+          format: nullable
+    UserNotFound:
+      summary: User not found
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: User not found
+        details:
+          type: string
+          example: null
+    userUpdatedSuccessfuly:
+      summary: User not found
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: User updated successfully
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+              example: 6458c9be5ed9e651ecd911ea
+            walletAddress:
+              type: string
+              example: 0x81ed33ac3875379ee1a0d4625e2230b1a013e77d
+            role:
+              type: string
+              example: user
+            totalRefferal:
+              type: number
+              example: 0
+            status:
+              type: string
+              example: active
+            verified:
+              type: boolean
+            picture:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/stable/users/0ebf6b35fe5f44a9abe449965fbcc5c3.jpg
+            coverPicture:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/stable/users/969a628e20594e639d4c6b8887fcf82c.jpg
+            followersCount:
+              type: number
+              example: 0
+            followingCount:
+              type: number
+              example: 0
+            numberOfLikedTokens:
+              type: number
+              example: 0
+            numberOfLikedCollections:
+              type: number
+              example: 0
+            tokenCreated:
+              type: number
+              example: 0
+            tokenSold:
+              type: number
+              example: 0
+            likedImage:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart.png
+            unLikedImage:
+              type: string
+              example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart-outline-icon.png
+            Permissions:
+              type: array
+              items:
+            followers:
+              type: array
+              items:
+            following:
+              type: array
+              items:
+            likedTokens:
+              type: array
+              items:
+            likedCollections:
+              type: array
+              items:
+            createdAt:
+              type: string
+              format: date-time
+              example: 2023-05-08T10:06:54.755Z
+            updatedAt:
+              type: string
+              format: date-time
+              example: 2023-05-08T11:11:18.750Z
+            __v:
+              type: number
+              example: 0
+            bio:
+              type: string
+              example: this is my bio update
+    InvalidCredential:
+      summary: UnAuthorized
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 401
+        message:
+          type: string
+          example: Invalid Email Address or password
+        details:
+          example: null
+    AdminSigninSuccessfuly:
+      summary: Admin login successful
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: Admin logged in successfully
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  example: 6454e793c83d5b5f8425be50
+                walletAddress:
+                  type: string
+                  example: 0x81ed33ac3875379ee1a0d4625e2230b1a013e77d
+                role:
+                  type: string
+                  example: admin
+                totalRefferal:
+                  type: number
+                  example: 0
+                status:
+                  type: string
+                  example: active
+                verified:
+                  type: boolean
+                picture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/placeholder.png
+                coverPicture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/cover-placeholder.png
+                followersCount:
+                  type: number
+                  example: 0
+                followingCount:
+                  type: number
+                  example: 0
+                numberOfLikedTokens:
+                  type: number
+                  example: 0
+                numberOfLikedCollections:
+                  type: number
+                  example: 0
+                tokenCreated:
+                  type: number
+                  example: 0
+                tokenSold:
+                  type: number
+                  example: 0
+                likedImage:
+                  type: string
+                  example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart.png
+                unLikedImage:
+                  type: string
+                  example: https://kashmiri-s3.s3.ap-southeast-1.amazonaws.com/heart-outline-icon.png
+                Permissions:
+                  type: array
+                  items:
+                followers:
+                  type: array
+                  items:
+                following:
+                  type: array
+                  items:
+                likedTokens:
+                  type: array
+                  items:
+                likedCollections:
+                  type: array
+                  items:
+                createdAt:
+                  type: string
+                  format: date-time
+                  example: 2023-05-05T11:25:07.257Z
+                updatedAt:
+                  type: string
+                  format: date-time
+                  example: 2023-05-05T11:25:07.257Z
+                __v:
+                  type: number
+                  example: 0
+            token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXlc3MiOiIweDgxRUQzM0FD2U3N2QiLCJpYYXIjoigcS499z18oUi8j7E0
+    OnlyAdminAccess:
+      summary: Only Admin Access
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 403
+        message:
+          type: string
+          example: Only Admin can access
+        details:
+          example: null
+    OnlyCreatorAccess:
+      summary: Only Creator Access
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 403
+        message:
+          type: string
+          example: Only Creator can access
+        details:
+          example: null
+    RefreshTokenSuccess:
+      summary: Access Token creation successful
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Access Token creation successful
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY0MzU3MDY0OGM5YmNmYzU"
+    LogoutSuccess:
+      summary: Logout Successful
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Logout Successful
+    AdminSignInSuccess:
+      summary: Signin Success
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Signin Successful
+        data:
+          type: object
+          properties:
+            admin:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  example: 643570648c9bcfc51fe8148b
+                name:
+                  type: string
+                  example: arham ali
+                email:
+                  type: string
+                  example: abc@example.com
+                role:
+                  type: string
+                  example: admin
+                profileImage:
+                  type: string
+                  example: "https://tomi-gems.s3.us-west-2.amazonaws.com/avatar.png"
+                createdAt:
+                  type: string
+                  example: "2023-04-11T14:36:20.108Z"
+                updatedAt:
+                  type: string
+                  example: "2023-04-11T14:36:20.108Z"
+            accessToken:
+              type: string
+              example: eyJhbGciOiJIIkpXVCJ9.eyJpZTQ4YiIsInJvbGUiOiJ1c2VyIiwicHJvImlhdCI6MTY4MTIyNzQ5MCwiZXhwIjoxNjgxMzEzODkwLCJhdWQiOiI2NDM1NzA2NiJ0b21pZ2Vtcy5jb20ifQ.SpGKjMjevF2SOMaX7u0
+            refreshToken:
+              type: string
+              example: eyJhbGciOiJIIkpXVCJ9.eyJpZTQ4YiIsInJvbGUiOiJ1c2VyIiwicHJvImlhdCI6MTY4MTIyNzQ5MCwiZXhwIjoxNjgxMzEzODkwLCJhdWQiOiI2NDM1NzA2NiJ0b21pZ2Vtcy5jb20ifQ.SpGKjMjevF2SOMaX7u0
+    ForgotPasswordInitiationSuccess:
+      summary: Password reset link sent via email
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Password reset link sent via email
+    ResetPasswordInitiationSuccess:
+      summary: Your Password has been successfuly changed.
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Your Password has been successfuly changed.
+    AdminNotFound:
+      summary: Admin not found
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: Admin not found
+        details:
+          example: null
+    CreatorNotFound:
+      summary: Creator not found
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: Creator not found
+        details:
+          example: null
+    CreatorSignUpSuccess:
+      summary: Creator signup successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Creator signup successfully
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+              example: "65c0e4954e557f18e560916f"
+            email:
+              type: string
+              example: "abc@example.com"
+            role:
+              type: string
+              example: "creator"
+            isVerified:
+              type: boolean
+              example: false
+            isBlocked:
+              type: boolean
+              example: false
+    CreatorMyProfile:
+      summary: My profile
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: My profile
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+              example: "65be4063043a1018a3422c71"
+            name:
+              type: string
+              example: "ghosty"
+            email:
+              type: string
+              example: "abc@gmail.com"
+            profileImageUrl:
+              type: string
+              example: "https://bluemoon-s3.s3.us-west-2.amazonaws"
+            coverImageUrl:
+              type: string
+              example: "https://bluemoon-s3.s3.us-west-2.amazonaws"
+            bio:
+              type: string
+              example: "abc"
+            role:
+              type: string
+              example: "creator"
+    UpdateProfileSuccessfully:
+      summary: Profile updated successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Profile updated successfully
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+              example: "65be4063043a1018a3422c71"
+            name:
+              type: string
+              example: "ghosty"
+            email:
+              type: string
+              example: "abc@gmail.com"
+            profileImageUrl:
+              type: string
+              example: "https://bluemoon-s3.s3.us-west-2.amazonaws"
+            coverImageUrl:
+              type: string
+              example: "https://bluemoon-s3.s3.us-west-2.amazonaws"
+            bio:
+              type: string
+              example: "abc"
+            role:
+              type: string
+              example: "creator"
+    ToggleCreatorVerificationSuccess:
+      summary: Toggle creator verification successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Toggle creator verification successfully
+    ToggleCreatorBlockedStatusSuccess:
+      summary: Toggle creator block status successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Toggle creator block status successfully
+    CreatorList:
+      summary: Creators list
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Creators list
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 10
+            creators:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65c0e4954e557f18e560916f
+                  name:
+                    type: string
+                    example: abc
+                  isVerified:
+                    type: boolean
+                    example: true
+                  isBlocked:
+                    type: boolean
+                    example: true
+                  profileImageUrl:
+                    type: string
+                    example: "https://bluemoon..."
+            pages:
+              type: number
+              example: 1
+    AdminDashboardStats:
+      summary: Dashboard stats
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Dashboard stats
+        data:
+          type: object
+          properties:
+            collections:
+              type: number
+              example: 1
+            creators:
+              type: number
+              example: 1
+            users:
+              type: number
+              example: 1
+    ActivityCheck:
+      summary: Activity
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: address check
+        data:
+          type: boolean
+    LaunchpadCollectionList:
+      summary: Launchpad collections
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Launchpad collections
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+                example: 65c3350898456666b6f953eb
+              name:
+                type: string
+                example: Ghosty
+              price:
+                type: number
+                example: 10
+              itemsCreated:
+                type: number
+                example: 10
+              minted:
+                type: number
+                example: 10
+              mintEndTime:
+                type: string
+                example: "2024-02-12T00:00:00.000Z"
+              imageUrl:
+                type: string
+                example: "https:///bluemoon"
+    LaunchpadImageDeleteSuccess:
+      summary: Launchpad image delete successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Launchpad image delete successfully
+    CreatorCreatedLaunchpadList:
+      summary: Creator created launchpads
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Creator created launchpads
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 10
+            launchpads:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65c3350898456666b6f953eb
+                  name:
+                    type: string
+                    example: Ghosty
+                  price:
+                    type: number
+                    example: 10
+                  itemsCreated:
+                    type: number
+                    example: 10
+                  minted:
+                    type: number
+                    example: 10
+                  mintStartTime:
+                    type: string
+                    example: "2024-02-12T00:00:00.000Z"
+                  mintEndTime:
+                    type: string
+                    example: "2024-02-12T00:00:00.000Z"
+                  imageUrl:
+                    type: string
+                    example: "https:///bluemoon..."
+            pages:
+              type: number
+              example: 10
+    GetUserSuccessfuly:
+      summary: User profile
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 200
+        message:
+          type: string
+          example: User profile
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  example: 6454e793c83d5b5f8425be50
+                walletAddress:
+                  type: string
+                  example: 0x81ed33ac3875379ee1a0d4625e2230b1a013e77d
+                role:
+                  type: string
+                  example: user
+                status:
+                  type: string
+                  example: active
+                verified:
+                  type: boolean
+                blockStatus:
+                  type: boolean
+                  example: false
+                picture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/placeholder.png
+                coverPicture:
+                  type: string
+                  example: https://bluemoon-s3.s3.us-west-2.amazonaws.com/pictures/cover-placeholder.png
+    MintNftsSuccess:
+      summary: Nft minted successfully
+      type: object
+      properties:
+        statusCode:
+          type: number
+          example: 201
+        message:
+          type: string
+          example: Nft minted successfully
+    LaunchpadCollectionItemsList:
+      summary: Collections Items
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Collections Items
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 100
+            collectionsItems:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  nft:
+                    type: string
+                    example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+                  walletAddress:
+                    type: string
+                    example: "0xc0fc8954c62a45c3c0a13813bd2a10d88d70750d"
+                  price:
+                    type: number
+                    example: 0.002
+                  tokenID:
+                    type: number
+                    example: 1
+                  collectionAddress:
+                    type: string
+                    example: "0xbf308e077d2d2ee1fcaa4296cc7eeb1b078074ae"
+                  launchpadId:
+                    type: string
+                    example: "65d339953ccea6789759e343"
+                  creatorId:
+                    type: string
+                    example: "65d325305a269c536d9d5c94"
+                  status:
+                    type: string
+                    example: "owned"
+                  isFixedPrice:
+                    type: boolean
+                    example: false
+                  openForBid:
+                    type: boolean
+                    example: false
+                  mintCompleted:
+                    type: boolean
+                    example: false
+            pages:
+              type: number
+              example: 10
+    TopSellerList:
+      summary: Top Seller
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Top Seller
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 3
+            topsellers:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  coverPicture:
+                    type: string
+                    example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+                  picture:
+                    type: string
+                    example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+                  verified:
+                    type: boolean
+                    example: true
+                  name:
+                    type: string
+                    example: shahid
+                  sales:
+                    type: number
+                    example: 1
+                  salesCore:
+                    type: number
+                    example: 12
+            pages:
+              type: number
+              example: 10
+    LaunchpadActivities:
+      summary: Collections Activities
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Collections Activities
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 3
+            collectionActivites:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  nftId:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  nft:
+                    type: string
+                    example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+                  tokenId:
+                    type: number
+                    example: 9
+                  price:
+                    type: number
+                    example: 45
+                  type:
+                    type: string
+                    example: bid
+                  launchpadId:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        example: 65d34ab03ccea678978c7238
+                      name:
+                        type: string
+                        example: Malik
+                  from:
+                    type: string
+                    example: "0x22d10e0a5664fcd31f768857fec39ff8e7fb1137"
+            pages:
+              type: number
+              example: 10
+    NftActivities:
+      summary: Nft Activites
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft Activites
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+                example: 65d33ce836cedba138e8e367
+              nftId:
+                type: string
+                example: 65d33ce836cedba138e8e367
+              nft:
+                type: string
+                example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+              tokenId:
+                type: number
+                example: 9
+              price:
+                type: number
+                example: 45
+              type:
+                type: string
+                example: bid
+              launchpadId:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65d34ab03ccea678978c7238
+                  name:
+                    type: string
+                    example: Malik
+              from:
+                type: string
+                example: "0x22d10e0a5664fcd31f768857fec39ff8e7fb1137"
+    UserActivitiesList:
+      summary: User actitivites
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: User actitivites
+        data:
+          type: object
+          properties:
+            count:
+              type: number
+              example: 3
+            userActivites:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  nftId:
+                    type: string
+                    example: 65d33ce836cedba138e8e367
+                  nft:
+                    type: string
+                    example: "https://gateway.pinata.cloud/ipfs/QmY6vfSZDb5uYguHyXxiaWo7eqYpKiUdmcrLqD6TEedEXp/1.png"
+                  tokenId:
+                    type: number
+                    example: 9
+                  price:
+                    type: number
+                    example: 45
+                  type:
+                    type: string
+                    example: bid
+                  launchpadId:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        example: 65d34ab03ccea678978c7238
+                      name:
+                        type: string
+                        example: Malik
+                  from:
+                    type: string
+                    example: "0x22d10e0a5664fcd31f768857fec39ff8e7fb1137"
+            pages:
+              type: number
+              example: 10
+    NftLikeSuccess:
+      summary: Nft Like successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft Like successfully
+    NftDislikeSuccess:
+      summary: Nft dislike successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft dislike successfully
+    ClaimNftsSuccess:
+      summary: Nft claimed successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft claimed successfully
+    LaunchpadFinalizeSuccess:
+      summary: launchpad finalize successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: launchpad finalize successfully
+    NftOfferCreationSuccess:
+      summary: Offer place successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Offer place successfully
+    NftOffers:
+      summary: Nft offers
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft offers
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+                example: 65e0388a845c7a0c50a92015
+              offerAddress:
+                type: string
+                example: "0x22d10e0a5664fcd31f768857fec39ff8e7fb1137"
+              offerPrice:
+                type: string
+                example: "0x22d10e0a5664fcd31f768857fec39ff8e7fb1137"
+              createdAt:
+                type: string
+                example: "2024-02-29T07:33:37.133Z"
+    NftOfferAcceptSuccess:
+      summary: Nft offer accept Successfully
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Nft offer accept Successfully
+    FilesLinkSuccess:
+      summary: files links created
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: files links created successfully
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 12
+              linkUrl:
+                type: string
+                example: https://www.google.com
+              createdAt:
+                type: string
+                example: "2022-10-30T10:35:29.982Z"
+              updatedAt:
+                type: string
+                example: "2022-10-30T10:35:29.982Z"

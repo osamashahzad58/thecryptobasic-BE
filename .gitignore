@@ -1,0 +1,13 @@
+.node_modules
+node_modules
+.env
+
+
+misc.txt
+node_modules
+
+./secrets/*.json
+
+./secrets/cdp_api_key.json
+./secrets/google-services.json
+secrets/*
