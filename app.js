@@ -8,10 +8,10 @@ const registerScheduledJobs = require("./jobs");
 
 const app = express();
 
-// (async () => {
-//   require("./helpers/db");
-//   registerSubscribers();
-// })();
+(async () => {
+  require("./helpers/db");
+  // registerSubscribers();
+})();
 // Call startServer()
 
 (async () => {

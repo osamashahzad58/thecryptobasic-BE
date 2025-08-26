@@ -49,6 +49,9 @@ module.exports = {
       batchLimit: 2, //same as firebase limit
     },
   },
+  coinMarketCap: {
+    apiKey: process.env.CMC_API_KEY,
+  },
   sendgrid: {
     apiKey: process.env.SENDGRID_API_KEY,
     sender: process.env.SENDGRID_EMAIL_SENDER,
