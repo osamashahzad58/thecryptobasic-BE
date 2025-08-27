@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 API_KEY_HELIUS = process.env.HELIUS_API_KEY;
+
 async function getWalletTokensHelius(WALLET) {
     
     const balancesUrl = `https://api.helius.xyz/v0/addresses/${WALLET}/balances?api-key=${API_KEY_HELIUS}`;
@@ -46,4 +47,4 @@ async function getWalletTokensHelius(WALLET) {
         price: info?.tokenInfo?.priceInfo?.pricePerToken || metaDataPrice?.pairs[0]?.priceUsd || metaDataPrice?.pairs[0]?.priceNative
     });
   }
-  
+  exports = getWalletTokensHelius;

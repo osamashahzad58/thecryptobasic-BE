@@ -5,7 +5,7 @@ const API_KEY = process.env.API_KEY_MORALIS;
 
 const CHAIN = "bsc"; // change chain accordingly e.g "eth", "bsc", "polygon", "avalanche", "fantom", etc.
 
-async function getWalletTokens(walletaddress, chain) {
+exports.getWalletTokens = async (walletaddress, chain) => {
 
     const url = `https://deep-index.moralis.io/api/v2.2/wallets/${walletaddress}/tokens?chain=${chain}`;
 
