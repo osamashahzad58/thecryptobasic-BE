@@ -8,6 +8,7 @@ const USERS_EVENTS = require("../../users/constants/users.events.constants");
 const eventEmitter = require("../../common/events/events.event-emitter");
 const CONSTANTS = require("../../common/constants/constants");
 const cryptoUtils = require("../../common/crypto/crypto.util");
+const { googleAuthenticate } = require("../../common/google/googleAuth");
 
 exports.signin = async (signInDto, result = {}) => {
   try {
@@ -542,6 +543,35 @@ exports.resetPassword = async (resetPasswordDto, result = {}) => {
         name: response.data.name,
       });
     }
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.signupWithGoogle = async (code, result = {}) => {
+  try {
+    const { payload } = await googleAuthenticate(code);
+    const { email, name, picture } = payload;
+
+    let user = await usersService.findByEmail(email);
+
+    if (!user) {
+      user = await usersService.create({
+        email,
+        name,
+        profilePicture: picture,
+        provider: "google",
+      });
+    }
+
+    const token = JWT.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    result.data = { user, token };
   } catch (ex) {
     result.ex = ex;
   } finally {

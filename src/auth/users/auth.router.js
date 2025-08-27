@@ -57,6 +57,8 @@ router.post(
   ],
   authController.resetPassword
 );
+router.post("/signupWithGoogle", authController.signupWithGoogle);
+
 router.delete("/logout", [JWT.verifyAccessToken], authController.logout);
 
 module.exports = router;
