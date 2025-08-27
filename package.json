@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node ./bin/www",
     "start:dev": "nodemon ./bin/www",
-    "seed-db:admin-credentials": "node ./seeders/seed.js seed-admin-credentials"
+    "seed-db:admin-credentials": "node ./seeders/seed.js seed-admin-credentials",
+    "script": "node ./misc/start-script.js"
   },
   "dependencies": {
     "@aws-sdk/abort-controller": "^3.183.0",
@@ -14,6 +15,7 @@
     "@sendgrid/mail": "^7.7.0",
     "@skavinvarnan/cryptlib": "^1.0.3",
     "@socket.io/redis-adapter": "^8.3.0",
+    "@solana/web3.js": "^1.98.4",
     "@zkmelabs/widget": "^0.3.3",
     "aws-sdk": "^2.1225.0",
     "bcrypt": "^5.1.1",
