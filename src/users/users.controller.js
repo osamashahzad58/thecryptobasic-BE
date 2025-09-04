@@ -106,3 +106,18 @@ exports.verifyOtp = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getUserWatchlist = async function (req, res, next) {
+  try {
+    const { id: userId } = req.user;
+    const result = await usersService.getUserWatchlist({ userId });
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User watchlist data",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

@@ -71,6 +71,23 @@ exports.getPriceChart = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getCompare = async (req, res, next) => {
+  try {
+    const getCompareDto = { ...req.query };
+    const result = await cmcCoinsService.getCompare(getCompareDto);
+
+    if (result.ex) throw result.ex;
+    if (result.data.error)
+      throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Currency Price Chart",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getPricePerformanceStats = async (req, res, next) => {
   try {
     const getPricePerformanceStatsDto = { ...req.query };

@@ -27,4 +27,10 @@ router.post(
   ],
   usersController.profile
 );
+router.get(
+  "/getWatchlist",
+  JWT.verifyAccessToken,
+  usersController.getUserWatchlist
+);
+
 module.exports = router;

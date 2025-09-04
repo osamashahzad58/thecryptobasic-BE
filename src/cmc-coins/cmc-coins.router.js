@@ -39,6 +39,14 @@ router.get(
   cmcCoinsController.getPriceChart
 );
 router.get(
+  "/compare",
+  [
+    // JWT.verifyAccessToken,
+    validate(cmcCoinsValidation.getCompare, { keyByField: true }),
+  ],
+  cmcCoinsController.getCompare
+);
+router.get(
   "/getPricePerformanceStats",
   [
     // JWT.verifyAccessToken,

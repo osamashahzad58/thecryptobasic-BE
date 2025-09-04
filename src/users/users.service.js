@@ -1,4 +1,5 @@
 let User = require("./users.model");
+let Watchlist = require("../watchlist/watchlist.model");
 const mongoose = require("mongoose");
 const eventEmitter = require("../common/events/events.event-emitter");
 const configs = require("../../configs");
@@ -178,6 +179,30 @@ exports.userById = async (getUsersDto, result = {}) => {
     }
   } catch (ex) {
     result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getUserWatchlist = async (getUsersDto, result = {}) => {
+  try {
+    const { userId } = getUsersDto;
+
+    const userProfile = await Watchlist.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+    })
+      .populate("userId")
+      .lean();
+
+    if (userProfile) {
+      result.data = userProfile;
+    } else {
+      result.error = true;
+      result.message = "User watchlist not found.";
+    }
+  } catch (ex) {
+    console.error("Error while fetching the question:", ex.message);
+    result.error = true;
+    result.ex = ex.message;
   } finally {
     return result;
   }

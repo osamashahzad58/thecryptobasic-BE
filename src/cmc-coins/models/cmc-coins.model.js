@@ -33,6 +33,7 @@ const cmcCoinsSchema = new mongoose.Schema(
     all_time_low: { type: Number, default: null },
     month_high: { type: Number, default: null },
     month_low: { type: Number, default: null },
+    categories: { type: Array, default: [] },
 
     socials: {
       twitter: { type: String, default: null },

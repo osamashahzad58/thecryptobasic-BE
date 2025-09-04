@@ -2,6 +2,9 @@ const axios = require("axios");
 const configs = require("../../configs");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const CoinsLoser = require("./models/cmc-topLosser.model");
+const CoinsGainer = require("./models/cmc-topGainners.model");
+const CoinsMostVisited = require("./models/cmc-mostVisited.model");
 
 exports.create = async (createDto, result = {}) => {
   try {
@@ -140,6 +143,55 @@ exports.getPriceChart = async (getPriceChartsDto, result = {}) => {
     );
     const idData = listingResp.data.data[id];
     result.data = idData.quotes;
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getCompare = async (getCompareDto, result = {}) => {
+  try {
+    const { tokenA, tokenB } = getCompareDto;
+
+    const [coinA, coinB] = await Promise.all([
+      CmcCoinsModel.findOne({ name: { $regex: `^${tokenA}$`, $options: "i" } }),
+      CmcCoinsModel.findOne({ name: { $regex: `^${tokenB}$`, $options: "i" } }),
+    ]);
+
+    if (!coinA || !coinB) {
+      result.error = true;
+      result.message = "One or both coins not found.";
+      return result;
+    }
+    const priceA = parseFloat(coinA.price);
+    const marketCapA = parseFloat(coinA.market_cap);
+    const marketCapB = parseFloat(coinB.market_cap);
+    const calculatedPrice = (marketCapB / marketCapA) * priceA;
+    const multiplier = marketCapB / marketCapA;
+    const formatCurrency = (num) =>
+      `$${num.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+
+    const formattedComparison = `${formatCurrency(
+      calculatedPrice
+    )} (${multiplier.toFixed(2)}x)`;
+    result.data = {
+      tokenA: {
+        name: coinA.name,
+        symbol: coinA.symbol,
+        price: priceA,
+        marketCap: marketCapA,
+      },
+      tokenB: {
+        name: coinB.name,
+        symbol: coinB.symbol,
+        price: parseFloat(coinB.price),
+        marketCap: marketCapB,
+      },
+      comparison: formattedComparison,
+    };
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -337,6 +389,63 @@ exports.getCoinByIdWithCMC = async (getPricePerformanceStatsDto) => {
   } catch (ex) {
     console.error("Error response:", ex.response?.data || ex.message);
     result.ex = ex.response?.data || ex.message;
+  } finally {
+    return result;
+  }
+};
+exports.addTopGainers = async (addTopGainers, result = {}) => {
+  try {
+    // insertMany allows bulk inserts
+    result.data = await CoinsGainer.insertMany(addTopGainers, {
+      ordered: false,
+      rawResult: false,
+    });
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.addLoserGainers = async (addLoserGainers, result = {}) => {
+  try {
+    result.data = await CoinsLoser.insertMany(addLoserGainers, {
+      ordered: false,
+      rawResult: false,
+    });
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.addMostVisited = async (addMostVisited, result = {}) => {
+  try {
+    console.log("addMostVisited");
+    result.data = await CoinsMostVisited.insertMany(addMostVisited);
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+exports.deleteTopAndLoserGainers = async (result = {}) => {
+  try {
+    await Promise.all([
+      CoinsGainer.deleteMany({}), // clears all docs
+      CoinsLoser.deleteMany({}), // clears all docs
+    ]);
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.deleteMostVisited = async (result = {}) => {
+  try {
+    await Promise.all([CoinsMostVisited.deleteMany({})]);
+  } catch (ex) {
+    result.ex = ex;
   } finally {
     return result;
   }

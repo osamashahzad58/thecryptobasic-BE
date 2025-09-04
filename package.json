@@ -13,6 +13,7 @@
     "@sendgrid/client": "^7.7.0",
     "@sendgrid/mail": "^7.7.0",
     "@skavinvarnan/cryptlib": "^1.0.3",
+    "@socket.io/admin-ui": "^0.5.1",
     "@socket.io/redis-adapter": "^8.3.0",
     "@zkmelabs/widget": "^0.3.3",
     "aws-sdk": "^2.1225.0",

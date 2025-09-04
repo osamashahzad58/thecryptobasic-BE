@@ -7,7 +7,7 @@
 var app = require("../app");
 var debug = require("debug")("dop-oracle:server");
 var http = require("http");
-const websocket = require("../websockets");
+const sockets = require("../websockets");
 
 /**
  * Get port from environment and store in Express.
@@ -26,6 +26,7 @@ var server = http.createServer(app);
 /**
  * Listen on provided port, on all network interfaces.
  */
+// sockets.initServer(server);
 
 server.listen(port);
 server.on("error", onError);
@@ -57,7 +58,7 @@ function normalizePort(val) {
 
 // intialize websocket server
 (async function () {
-  await websocket.initServer(server);
+  await sockets.initServer(server);
 })();
 
 function onError(error) {
