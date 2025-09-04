@@ -1,28 +1,32 @@
 const { CronJob } = require("cron");
 const coinmodel = require("../src/cmc-coins/models/cmc-coins.model");
-const webSockets = require("../websockets");
+const { getSubscriptions } = require("../websockets/subscriptions");
 
 /**
  * Emit coin prices with pagination
- * @param {number} limit - items per page (required)
- * @param {number} offset - skip items (required)
- * @param {string} room - socket room (required)
+ * @param {number} limit
+ * @param {number} offset
+ * @param {string} room
+ * @param {Server} io
  */
-async function getAndInsertCoinsPrice(limit, offset, room) {
+async function getAndInsertCoinsPrice(limit, offset, room, io) {
   console.log(limit, offset, room, "limit, offset, room [emitter]");
 
   try {
     if (
-      typeof limit !== "number" ||
-      typeof offset !== "number" ||
+      !Number.isFinite(limit) ||
+      !Number.isFinite(offset) ||
       typeof room !== "string"
     ) {
-      throw new Error("limit, offset, and room are required from frontend");
+      throw new Error(
+        "limit (number), offset (number), and room (string) are required"
+      );
+    }
+    if (!io || typeof io.to !== "function") {
+      throw new Error("socket.io `io` instance is required to emit data");
     }
 
     console.log("---Coin price Emitter Started---", { limit, offset, room });
-
-    const io = webSockets.getIO();
 
     const coins = await coinmodel
       .find({})
@@ -47,15 +51,45 @@ async function getAndInsertCoinsPrice(limit, offset, room) {
 
     console.log("---Coin price Emitter Done---");
   } catch (ex) {
-    console.log("---Coin price Emitter Exception---", ex.message);
+    console.log(
+      "---Coin price Emitter Exception---",
+      ex && ex.message ? ex.message : ex
+    );
   }
 }
 
-// cron job (broadcast to default room)
-function initializeJob() {
-  const job = new CronJob("*/10 * * * * *", () => {
-    getAndInsertCoinsPrice(100, 0, "broadcast-room");
+/**
+ * initializeJob(getIO)
+ * - getIO: function that returns the socket.io `io` instance
+ */
+function initializeJob(getIO) {
+  if (typeof getIO !== "function") {
+    console.log("initializeJob skipped: supply initializeJob(getIO)");
+    return;
+  }
+
+  const job = new CronJob("*/10 * * * * *", async () => {
+    try {
+      const io = getIO();
+      if (!io) {
+        console.log("Cron skipped: io not available yet");
+        return;
+      }
+
+      const subs = getSubscriptions();
+      if (!subs.length) {
+        console.log("No subscriptions yet, cron skipped");
+        return;
+      }
+
+      for (const { limit, offset, room } of subs) {
+        await getAndInsertCoinsPrice(limit, offset, room, io);
+      }
+    } catch (err) {
+      console.log("Cron job error:", err && err.message ? err.message : err);
+    }
   });
+
   job.start();
 }
 
