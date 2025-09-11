@@ -1,13 +1,14 @@
 const { Server } = require("socket.io");
+const { instrument } = require("@socket.io/admin-ui");
+const { SERVER_ENVIRONMENTS } = require("../helpers/constants");
 const { createClient } = require("redis");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const configs = require("../configs");
-const { applyMiddlewares } = require("./middlewares");
-const { heartbeatHandler } = require("./utils/ws-heartbeat.util");
-const { disconnectionHandler } = require("./utils/ws-connection.util");
-const redisClient = require("../helpers/redis");
-
 let io;
+const roomHandler = require("./handlers/room.handler");
+const messageHandler = require("./handlers/message.handler");
+const { heartbeatHandler } = require("./handlers/ws-heartbeat.handler");
+const { disconnectionHandler } = require("./handlers/ws-connection.handler");
 
 module.exports.initServer = async (server) => {
   try {
@@ -15,10 +16,16 @@ module.exports.initServer = async (server) => {
       cors: {
         origin: "*",
       },
-      transports: ["websocket"],
-      pingInterval: 30000,
-      pingTimeout: 15000,
+      transports: ["websocket", "polling"],
+      // path: "/chats/sockets",
     });
+
+    if (process.env.NODE_ENV !== SERVER_ENVIRONMENTS.PRODUCTION) {
+      instrument(io, {
+        auth: false,
+      });
+    }
+
     const pubClient = createClient({
       url: configs.redis.host,
     });
@@ -28,28 +35,14 @@ module.exports.initServer = async (server) => {
 
     await Promise.all([pubClient.connect(), subClient.connect()]);
 
-    // apply middlewares
-    applyMiddlewares(io);
-
-    io.on("connection", async (socket) => {
-      const { user } = socket.handshake;
-      if (user) {
-        await redisClient.set(
-          `user:${user.id}`,
-          socket.id,
-
-          {
-            XX: true,
-            EX: 60,
-          }
-        );
-      }
-
-      heartbeatHandler(socket);
+    io.on("connection", (socket) => {
+      heartbeatHandler(socket, pubClient);
       disconnectionHandler(socket);
+      roomHandler(io, socket);
+      messageHandler(io, socket);
     });
   } catch (ex) {
-    console.log("Error while initializing websocket server ===>", ex.message);
+    console.log(ex);
     process.exit(-1);
   }
 };

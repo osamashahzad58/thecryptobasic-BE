@@ -20,6 +20,12 @@ module.exports = {
       limit: Joi.number().integer().required(),
     }),
   },
+  getCompare: {
+    query: Joi.object({
+      tokenA: Joi.string().required(),
+      tokenB: Joi.string().required(),
+    }),
+  },
   address: {
     query: Joi.object({
       address: Joi.string().trim().required(),

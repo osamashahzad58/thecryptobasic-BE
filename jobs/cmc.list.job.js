@@ -11,7 +11,7 @@ async function cmcList() {
     const listingsRes = await axios.get(
       "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
       {
-        params: { start: "1", limit: "200", convert: "USD" },
+        params: { start: "1", limit: "3", convert: "USD" },
         headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
       }
     );
@@ -60,7 +60,7 @@ async function cmcList() {
         circulating_supply: coin.circulating_supply?.toString(),
         total_supply: coin.total_supply?.toString(),
         max_supply: coin.max_supply?.toString(),
-
+        categories: infoData[coin.id]?.tags || [],
         website: infoData[coin.id]?.urls?.website || [],
         whitepaper: infoData[coin.id]?.urls?.technical_doc?.[0] || null,
         socials: {

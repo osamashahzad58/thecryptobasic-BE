@@ -228,3 +228,30 @@ exports.resetPassword = async (req, res, next) => {
     next(ex);
   }
 };
+exports.signupWithGoogle = async (req, res, next) => {
+  try {
+    const { code } = req.body; // frontend se "authorization_code" bhejna hai
+
+    if (!code) {
+      throw createError(
+        StatusCodes.BAD_REQUEST,
+        "Google auth code is required"
+      );
+    }
+
+    const result = await authService.signupWithGoogle(code);
+
+    if (result.ex) throw result.ex;
+    if (!result.data) {
+      throw createError(StatusCodes.INTERNAL_SERVER_ERROR, "Signup failed");
+    }
+
+    return res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Signup with Google successful",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

@@ -42,6 +42,9 @@ module.exports = {
       bucketBaseUrl: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_S3_BUCKET_REGION}.amazonaws.com/`,
     },
   },
+  websockets: {
+    authTimeoutInMilliSec: 10000,
+  },
   googleCloud: {
     firebase: {
       serviceAccountKey: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
