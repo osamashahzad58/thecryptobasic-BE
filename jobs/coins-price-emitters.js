@@ -1,33 +1,13 @@
 const { CronJob } = require("cron");
 const coinmodel = require("../src/cmc-coins/models/cmc-coins.model");
-const { getSubscriptions } = require("../websockets/subscriptions");
+const {
+  getPageSubscriptions,
+  getCoinIdSubscriptions,
+} = require("../websockets/subscriptions");
 
-/**
- * Emit coin prices with pagination
- * @param {number} limit
- * @param {number} offset
- * @param {string} room
- * @param {Server} io
- */
-async function getAndInsertCoinsPrice(limit, offset, room, io) {
-  console.log(limit, offset, room, "limit, offset, room [emitter]");
-
+// ---- Emit paginated coins ----
+async function emitCoinsPrice(limit, offset, room, io) {
   try {
-    if (
-      !Number.isFinite(limit) ||
-      !Number.isFinite(offset) ||
-      typeof room !== "string"
-    ) {
-      throw new Error(
-        "limit (number), offset (number), and room (string) are required"
-      );
-    }
-    if (!io || typeof io.to !== "function") {
-      throw new Error("socket.io `io` instance is required to emit data");
-    }
-
-    console.log("---Coin price Emitter Started---", { limit, offset, room });
-
     const coins = await coinmodel
       .find({})
       .skip(offset)
@@ -48,49 +28,55 @@ async function getAndInsertCoinsPrice(limit, offset, room, io) {
       room,
       emittedFrom: "Coin price Emitter",
     });
-
-    console.log("---Coin price Emitter Done---");
   } catch (ex) {
-    console.log(
-      "---Coin price Emitter Exception---",
-      ex && ex.message ? ex.message : ex
-    );
+    console.log("emitCoinsPrice error:", ex.message);
   }
 }
 
-/**
- * initializeJob(getIO)
- * - getIO: function that returns the socket.io `io` instance
- */
-function initializeJob(getIO) {
-  if (typeof getIO !== "function") {
-    console.log("initializeJob skipped: supply initializeJob(getIO)");
-    return;
+// ---- Emit single coin byId ----
+async function emitCoinById(coinId, room, io) {
+  try {
+    const coin = await coinmodel
+      .findOne({ coinId: String(coinId) })
+      .select(
+        "coinId logo symbol name price cmcRank market_cap volume_24h volume_change_24h percent_change_1h sparkline_7d updatedAt"
+      )
+      .lean();
+
+    if (coin) {
+      io.to(room).emit("coin_byId", {
+        coin,
+        room,
+        emittedFrom: "Coin byId Emitter",
+      });
+    }
+  } catch (ex) {
+    console.log("emitCoinById error:", ex.message);
   }
+}
+
+// ---- Cron initializer ----
+function initializeJob(getIO) {
+  if (typeof getIO !== "function") return;
 
   const job = new CronJob("*/10 * * * * *", async () => {
-    try {
-      const io = getIO();
-      if (!io) {
-        console.log("Cron skipped: io not available yet");
-        return;
-      }
+    const io = getIO();
+    if (!io) return;
 
-      const subs = getSubscriptions();
-      if (!subs.length) {
-        console.log("No subscriptions yet, cron skipped");
-        return;
-      }
+    // Paginated rooms
+    const pageSubs = getPageSubscriptions();
+    for (const { limit, offset, room } of pageSubs) {
+      await emitCoinsPrice(limit, offset, room, io);
+    }
 
-      for (const { limit, offset, room } of subs) {
-        await getAndInsertCoinsPrice(limit, offset, room, io);
-      }
-    } catch (err) {
-      console.log("Cron job error:", err && err.message ? err.message : err);
+    // CoinId rooms
+    const coinIdSubs = getCoinIdSubscriptions();
+    for (const { coinId, room } of coinIdSubs) {
+      await emitCoinById(coinId, room, io);
     }
   });
 
   job.start();
 }
 
-module.exports = { getAndInsertCoinsPrice, initializeJob };
+module.exports = { emitCoinsPrice, emitCoinById, initializeJob };

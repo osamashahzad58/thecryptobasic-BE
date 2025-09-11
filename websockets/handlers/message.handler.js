@@ -1,41 +1,64 @@
-const { addSubscription } = require("../subscriptions");
-const { getAndInsertCoinsPrice } = require("../../jobs/coins-price-emitters");
-const coinmodel = require("../../src/cmc-coins/models/cmc-coins.model");
+const {
+  addPageSubscription,
+  removePageSubscription,
+  addCoinIdSubscription,
+  removeCoinIdSubscription,
+} = require("../subscriptions");
+const {
+  emitCoinsPrice,
+  emitCoinById,
+} = require("../../jobs/coins-price-emitters");
 
 const handleMessages = (io, socket) => {
+  // Join paginated room
   socket.on("join_room", async (payload) => {
     try {
-      console.log(payload, "payload:::::::::");
-
       let { limit, offset, room } = payload.get || {};
-      if (!room) {
-        room = socket.id; // fallback to socket id if no room provided
-      }
+      if (!room) room = socket.id;
 
       limit = Number(limit);
       offset = Number(offset);
 
-      console.log(limit, offset, room, "limit, offset, room ✅");
-
       socket.join(room);
+      addPageSubscription({ limit, offset, room });
 
-      // Save this subscription so cron can replay later
-      addSubscription({ limit, offset, room });
-
-      // Send immediate data once
-      await getAndInsertCoinsPrice(limit, offset, room, io);
+      await emitCoinsPrice(limit, offset, room, io);
     } catch (err) {
       console.log("join_room error:::::::::", err);
       socket.emit("error", {
         status: "SERVER_ERR",
         message: "Something went wrong",
-        event: "join_room:sent",
+      });
+    }
+  });
+
+  // Join room by CoinId
+  socket.on("join_room_byId", async (payload) => {
+    try {
+      console.log(payload, "payload::::::::: [byId]");
+      let { coinId, room } = payload.get || {};
+      if (!room) room = socket.id;
+
+      if (!coinId) throw new Error("coinId is required");
+
+      socket.join(room);
+      addCoinIdSubscription({ coinId, room });
+
+      await emitCoinById(coinId, room, io);
+    } catch (err) {
+      console.log("join_room_byId error:::::::::", err);
+      socket.emit("error", {
+        status: "SERVER_ERR",
+        message: "Something went wrong",
       });
     }
   });
 
   socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
+    console.log("remove", socket.id);
+
+    removePageSubscription(socket.id);
+    removeCoinIdSubscription(socket.id);
   });
 };
 
