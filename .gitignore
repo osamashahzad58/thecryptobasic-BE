@@ -1,6 +1,9 @@
 .node_modules
 node_modules
+# Environment variable files
 .env
+.env.local
+.env.*.local
 
 misc.txt
 node_modules
