@@ -1,0 +1,38 @@
+name: Deploying dev Branch
+
+on:
+  push:
+    branches:
+      - dev 
+jobs:
+  deploy:
+
+    runs-on: [self-hosted, crypto-basic-vm] 
+
+    env:
+      PM2_PROCESS_NAME: "CryptoBasic-Development-Backend"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          clean: False
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+ 
+
+      - name: Start or Reload the Application
+        run: |
+          if pm2 list | grep -q "$PM2_PROCESS_NAME"; then
+            echo "Process $PM2_PROCESS_NAME exists. Reloading..."
+            pm2 reload "$PM2_PROCESS_NAME"
+          else
+            echo "Process $PM2_PROCESS_NAME does not exist. Starting..."
+            pm2 start "npm start" --name "$PM2_PROCESS_NAME"
+          fi
