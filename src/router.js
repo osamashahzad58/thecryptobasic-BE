@@ -2,6 +2,7 @@ const usersRouter = require("./users/users.router");
 const authRouter = require("./auth/auth.router");
 const adminsRouter = require("./admins/admins.router");
 const metadataRouter = require("./metadata/metadata.router");
+const coinsRouter = require("./cmc-coins/cmc-coins.router");
 
 const genrateOtp = require("./email-verification/email-verification.router");
 
@@ -11,4 +12,5 @@ exports.initRoutes = (app) => {
   app.use("/admins", adminsRouter);
   app.use("/metadata", metadataRouter);
   app.use("/genrateOtp", genrateOtp);
+  app.use("/coins", coinsRouter);
 };

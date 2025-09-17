@@ -3,6 +3,7 @@ const {
   TIME_INTERVALS,
   TIME_PERIOD,
 } = require("./constants/cmc-coins.enum.constant");
+const { search } = require("./cmc-coins.router");
 module.exports = {
   getPriceChart: {
     query: Joi.object({
@@ -47,6 +48,18 @@ module.exports = {
   getById: {
     query: Joi.object({
       id: Joi.string().trim().required(),
+    }),
+  },
+  AllCrypto: {
+    query: Joi.object({
+      limit: Joi.number().positive().required(),
+      search: Joi.string().optional(),
+      offset: Joi.number().positive().required(),
+      orderField: Joi.string().valid("price"),
+      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
+        is: Joi.exist(),
+        then: Joi.required(),
+      }),
     }),
   },
 };

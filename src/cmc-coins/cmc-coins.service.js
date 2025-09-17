@@ -1,10 +1,12 @@
 const axios = require("axios");
 const configs = require("../../configs");
+const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
 const CoinsGainer = require("./models/cmc-topGainners.model");
 const CoinsMostVisited = require("./models/cmc-mostVisited.model");
+const CoinsStats = require("./models/cmc-stats.model");
 
 exports.create = async (createDto, result = {}) => {
   try {
@@ -446,6 +448,150 @@ exports.deleteMostVisited = async (result = {}) => {
     await Promise.all([CoinsMostVisited.deleteMany({})]);
   } catch (ex) {
     result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getAllCryptoDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CmcCoinsModel.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CmcCoinsModel.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTopGainers = async (getTopGainersDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTopGainersDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsGainer.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsGainer.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getSearch = async (getSearchDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection, search } = getSearchDto;
+
+    const filter = {};
+
+    if (search && search.trim()) {
+      if (search.startsWith("0x")) {
+        // Search in contracts array
+        filter["contracts.contract"] = { $regex: search, $options: "i" };
+      } else {
+        // Search by name or symbol
+        filter.$or = [
+          { name: { $regex: search, $options: "i" } },
+          { symbol: { $regex: search, $options: "i" } },
+        ];
+      }
+    }
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: orderDirection === "desc" ? -1 : 1 }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CmcCoinsModel.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CmcCoinsModel.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+exports.getTopLossers = async (getTopLossersDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTopLossersDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsLoser.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsLoser.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTopstats = async ({ id }, result = {}) => {
+  try {
+    console.log({ id });
+    const question = await CoinsStats.findOne({
+      _id: ObjectId(id),
+    });
+    console.log(question, "question");
+    result.data = question;
+    result.success = true;
+  } catch (ex) {
+    console.error("Error while fetching the question:", ex.message);
+    result.error = true;
+    result.ex = ex.message;
+    result.success = false;
   } finally {
     return result;
   }

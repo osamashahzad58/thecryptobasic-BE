@@ -73,4 +73,30 @@ router.get(
   cmcCoinsController.getCoinByIdWithCMC
 );
 
+router.get(
+  "/AllCrypto",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getAllCrypto
+);
+router.get(
+  "/TopLossers",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTopLossers
+);
+router.get(
+  "/TopGainers",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTopGainers
+);
+router.get(
+  "/search",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getSearch
+);
+router.get(
+  "/Topstats/:id",
+  // [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTopstats
+);
+
 module.exports = router;

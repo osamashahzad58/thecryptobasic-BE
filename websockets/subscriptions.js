@@ -1,4 +1,3 @@
-// Separate subscription stores
 let pageSubscriptions = [];
 let coinIdSubscriptions = [];
 

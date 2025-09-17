@@ -10,11 +10,14 @@ const {
 } = require("../../jobs/coins-price-emitters");
 
 const handleMessages = (io, socket) => {
+  // use persistent clientId (from auth or fallback to socket.id)
+  const clientId = socket.handshake.auth?.clientId || socket.id;
+
   // Join paginated room
   socket.on("join_room", async (payload) => {
     try {
       let { limit, offset, room } = payload.get || {};
-      if (!room) room = socket.id;
+      if (!room) room = clientId;
 
       limit = Number(limit);
       offset = Number(offset);
@@ -37,7 +40,7 @@ const handleMessages = (io, socket) => {
     try {
       console.log(payload, "payload::::::::: [byId]");
       let { coinId, room } = payload.get || {};
-      if (!room) room = socket.id;
+      if (!room) room = clientId;
 
       if (!coinId) throw new Error("coinId is required");
 
@@ -55,10 +58,17 @@ const handleMessages = (io, socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("remove", socket.id);
+    console.log("disconnected", clientId);
 
-    removePageSubscription(socket.id);
-    removeCoinIdSubscription(socket.id);
+    // Grace period before removing subscriptions (to allow reconnect)
+    setTimeout(() => {
+      const stillConnected = io.sockets.adapter.rooms.get(clientId);
+      if (!stillConnected) {
+        removePageSubscription(clientId);
+        removeCoinIdSubscription(clientId);
+        console.log("subscriptions removed for", clientId);
+      }
+    }, 10000); // 10s
   });
 };
 
