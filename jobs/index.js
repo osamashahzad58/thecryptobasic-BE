@@ -7,7 +7,7 @@ const { initializeJob } = require("./coins-price-emitters");
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
   // cmcList.initializeJob();
-  cmcStats.initializeJob();
+  // cmcStats.initializeJob();
   // fetchCMCTopGainersAndLosers.initializeJob();
   // fetchCMCMostVisited.initializeJob();
 
