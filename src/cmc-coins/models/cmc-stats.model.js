@@ -11,13 +11,23 @@ const cmcStatsSchema = new mongoose.Schema(
     volume_24h: { type: Number, default: 0 },
     volume_change_24h: { type: Number, default: 0 },
 
+    // Dominance fields
     btc_dominance: { type: Number, default: 0 },
+    sol_dominance: { type: Number, default: 0 },
+    others_dominance: { type: Number, default: 0 },
     eth_dominance: { type: Number, default: 0 },
+
     eth_gas: { type: Number, default: 0 },
 
-    fear_greed: { type: Number, default: 0 },
-    fear_greed_label: { type: String, default: "Unknown" },
+    // Fear & Greed Index fields (updated with historical data)
+    fear_greed_now: { type: Number, default: 0 },
+    fear_greed_now_label: { type: String, default: "Unknown" },
+    fear_greed_yesterday: { type: Number, default: 0 },
+    fear_greed_yesterday_label: { type: String, default: "Unknown" },
+    fear_greed_last_month: { type: Number, default: 0 },
+    fear_greed_last_month_label: { type: String, default: "Unknown" },
 
+    // Altcoin season fields
     altcoin_season: { type: Number, default: 0 },
     altcoin_month: { type: Number, default: 0 },
     altcoin_year: { type: Number, default: 0 },

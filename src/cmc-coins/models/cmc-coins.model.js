@@ -42,6 +42,7 @@ const cmcCoinsSchema = new mongoose.Schema(
     },
     explorers: { type: [String], default: [] },
     markets: { type: Array, default: [] },
+    contracts: { type: Array, default: [] },
     chart: [
       {
         timestamp: { type: Date },

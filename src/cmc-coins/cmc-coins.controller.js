@@ -172,3 +172,89 @@ exports.getCoinByIdWithCMC = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getAllCrypto = async (req, res, next) => {
+  try {
+    const getAllCryptoDto = req.query;
+    const result = await cmcCoinsService.getAllCrypto(getAllCryptoDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get All Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTopGainers = async (req, res, next) => {
+  try {
+    const getTopGainersDto = req.query;
+    const result = await cmcCoinsService.getTopGainers(getTopGainersDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getSearch = async (req, res, next) => {
+  try {
+    const getSearchDto = req.query;
+    const result = await cmcCoinsService.getSearch(getSearchDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Search Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTopLossers = async (req, res, next) => {
+  try {
+    const getTopLossersDto = req.query;
+    const result = await cmcCoinsService.getTopLossers(getTopLossersDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Lossers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTopstats = async (req, res, next) => {
+  try {
+    // const getQuestionDto = {
+    //   id: req.params.id,
+    // };
+
+    const getTopstatsDto = {
+      id: req.params.id,
+    };
+    const result = await cmcCoinsService.getTopstats(getTopstatsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get stats successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
