@@ -45,6 +45,28 @@ module.exports = {
   websockets: {
     authTimeoutInMilliSec: 10000,
   },
+  elasticEmail: {
+    apiKey: process.env.SENDGRID_API_KEY,
+    sender: process.env.SENDGRID_EMAIL_SENDER,
+    senderName: process.env.SENDGRID_EMAIL_SENDER_NAME,
+    adminEmailAddress: process.env.SENDGRID_WIZARD_ADMIN_EMAIL_ADDRESS,
+    aboutUsEmailTemplateId: process.env.SENDGRID_WIZARD_ABOUT_US_TEMPLATE_ID,
+    passwordResetEmailTemplateId:
+      process.env.SENDGRID_WIZARD_PASSWORD_RESET_TEMPLATE_ID,
+    passwordVerifyEmailTemplateId:
+      process.env.SENDGRID_VERIFICATION_EMAIL_TEMPLATE_ID,
+    nftEmailTemplateId: process.env.SENDGRID_WIZARD_NFT_TEMPLATE_ID,
+    welcome: process.env.SENDGRID_EARLY_USER_TEMPLATE_ID,
+    sendOtp: process.env.SENDGRID_VERIFICATION_EMAIL_TEMPLATE_ID,
+  },
+
+  //   SENDGRID_API_KEY=703B5E4673250796633E66855D9F5097B8BE46912611D97E5E0F06AFD9D5CF6A01131B14BC49905FDC3EC14E87380E75
+  // SENDGRID_API_KEY_NAME=TheCryptoBasic
+  // SENDGRID_EMAIL_SENDER=support@thecryptobasic.com
+  // SENDGRID_EMAIL_SENDER_NAME="TheCryptoBasic"
+  // SENDGRID_EARLY_USER_TEMPLATE_ID=d-ff3af9e65d2a44c2b516e6d79e1e7c6d
+  // SENDGRID_VERIFICATION_EMAIL_TEMPLATE_ID=sendOtp
+
   googleCloud: {
     firebase: {
       serviceAccountKey: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,

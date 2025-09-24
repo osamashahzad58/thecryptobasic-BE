@@ -14,7 +14,8 @@ module.exports = {
   },
   signup: {
     body: Joi.object({
-      email: Joi.string().email().trim(),
+      email: Joi.string().email().trim().required(),
+      userName: Joi.string().required(),
       password: Joi.string().required(),
     }),
   },

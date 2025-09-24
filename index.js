@@ -1,5 +1,6 @@
 const { Web3 } = require("web3");
-const abi = require("./helpers/finalizeDataRequest.json");
+// const abi = require("./helpers/finalizeDataRequest.json");
+const abi = require("web3");
 
 const web3 = new Web3(
   "https://warmhearted-hidden-thunder.arbitrum-mainnet.quiknode.pro/c62b40f2ebe9ff587cc9bcd9ccac55b111502273/"

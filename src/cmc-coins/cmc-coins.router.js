@@ -84,6 +84,16 @@ router.get(
   cmcCoinsController.getTopLossers
 );
 router.get(
+  "/Most-Visited",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getMostVisited
+);
+router.get(
+  "/Trending",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTrending
+);
+router.get(
   "/TopGainers",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTopGainers

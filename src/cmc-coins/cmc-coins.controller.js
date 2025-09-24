@@ -204,6 +204,38 @@ exports.getTopGainers = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getMostVisited = async (req, res, next) => {
+  try {
+    const getMostVisitedDto = req.query;
+    const result = await cmcCoinsService.getMostVisited(getMostVisitedDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTrending = async (req, res, next) => {
+  try {
+    const getTrendingDto = req.query;
+    const result = await cmcCoinsService.getTrending(getTrendingDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getSearch = async (req, res, next) => {
   try {
     const getSearchDto = req.query;

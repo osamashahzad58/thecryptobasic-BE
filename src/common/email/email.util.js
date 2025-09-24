@@ -3,6 +3,8 @@ const configs = require("../../../configs");
 sgMail.setApiKey(configs.sendgrid.apiKey);
 const client = require("@sendgrid/client");
 const moment = require("moment");
+const axios = require("axios");
+const qs = require("qs");
 
 exports.loginCredentialsMail = async (
   loginCredentialsEmailPayload,
@@ -111,26 +113,60 @@ exports.sendAboutUsEmail = async (aboutUsEmailPayload, result = {}) => {
     return result;
   }
 };
-exports.sendEmailVerificationCode = async function (
-  confirmEmailPayload,
-  result = {}
-) {
+exports.sendEmail = async function (sendEmailPayload, result = {}) {
   try {
-    const { receiverEmail, emailVerificationLink, codeVerify } =
-      confirmEmailPayload;
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.verificationEmailTemplateId,
-      dynamicTemplateData: {
-        codeVerify,
-      },
+    const { receiverEmail, codeVerify } = sendEmailPayload;
+    console.log(sendEmailPayload, "sendEmailPayload 117");
+    // Validate input
+    if (
+      !receiverEmail ||
+      typeof receiverEmail !== "string" ||
+      !receiverEmail.includes("@")
+    ) {
+      throw new Error("Invalid recipient email address.");
+    }
+
+    if (!codeVerify) {
+      throw new Error("OTP Code is required.");
+    }
+
+    const emailPayload = {
+      to: String(receiverEmail).trim(),
+      subject: "Your OTP Code",
+      apiKey: configs.elasticEmail.apiKey,
+      from: "support@thecryptobasic.com",
+      fromName: "TheCryptoBasic",
+      template: configs.elasticEmail.sendOtp,
+      merge_otpCode: codeVerify,
+      isTransactional: true,
     };
-    const res = await sgMail.send(msg);
+    console.log(
+      emailPayload,
+      configs.elasticEmail.apiKey,
+      configs.elasticEmail.sendOtp,
+      "emailPayload"
+    );
+
+    const response = await axios.post(
+      "https://api.elasticemail.com/v2/email/send",
+      qs.stringify(emailPayload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    result.response = response.data;
+
+    // Check response success
+    if (!response.data.success) {
+      throw new Error(
+        `Elastic Email API Error: ${response.data.error || "Unknown error"}`
+      );
+    }
   } catch (ex) {
+    console.error("Elastic Email Error:", ex.response?.data || ex.message);
     result.ex = ex;
   } finally {
     return result;

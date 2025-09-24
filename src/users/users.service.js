@@ -56,19 +56,47 @@ exports.profile = async (profileDto, result = {}) => {
 // const mongoose = require("mongoose");
 exports.createUser = async (createUserDto, result = {}) => {
   try {
-    createUserDto = {
+    // Add default role
+    const userPayload = {
       ...createUserDto,
       role: "user",
     };
 
-    const savedUser = await User.create(createUserDto);
+    const savedUser = await User.create(userPayload);
 
-    const { password, ...safeUserData } = savedUser;
+    const email = userPayload.email;
+
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
+
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000);
+    savedUser.otp = otp;
+    savedUser.otpExpiresTime = expiryTime;
+    await savedUser.save();
+
+    eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.SEND_OTP, {
+      receiverEmail: email,
+      codeVerify: otp,
+    });
+
+    const {
+      password,
+      otp: _otp,
+      otpExpiresTime,
+      ...safeUserData
+    } = savedUser.toObject();
 
     result.data = safeUserData;
   } catch (ex) {
+    console.error("[createUser] Error occurred:", ex);
     result.ex = ex;
   } finally {
+    console.log("[createUser] Process finished.");
     return result;
   }
 };
