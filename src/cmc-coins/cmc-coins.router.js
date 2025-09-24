@@ -3,7 +3,7 @@ const router = require("express").Router();
 const { validate } = require("express-validation");
 const cmcCoinsController = require("./cmc-coins.controller");
 const cmcCoinsValidation = require("./cmc-coins.validation");
-//const JWT = require("../common/auth/jwt");
+//const JWT = require("../common/auth/jwt")
 
 router.get(
   "/listings",
@@ -82,6 +82,16 @@ router.get(
   "/TopLossers",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTopLossers
+);
+router.get(
+  "/Most-Visited",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getMostVisited
+);
+router.get(
+  "/Trending",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTrending
 );
 router.get(
   "/TopGainers",

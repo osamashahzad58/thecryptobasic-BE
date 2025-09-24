@@ -4,6 +4,7 @@ const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
+const CoinsTrending = require("./models/cmc-trending.model");
 const CoinsGainer = require("./models/cmc-topGainners.model");
 const CoinsMostVisited = require("./models/cmc-mostVisited.model");
 const CoinsStats = require("./models/cmc-stats.model");
@@ -344,16 +345,9 @@ exports.getById = async (getPricePerformanceStatsDto) => {
   const result = {};
   try {
     const { id } = getPricePerformanceStatsDto;
+    const dbData = await CmcCoinsModel.findOne({ coinId: String(id) });
 
-    const detailsUrl = `https://pro-api.coingecko.com/api/v3/coins/${id}?localization=true&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
-
-    const detailsResponse = await axios.get(detailsUrl, {
-      headers: {
-        "x-cg-pro-api-key": configs.privateKeys.ApiKeyCoingeko,
-      },
-    });
-
-    const detailsData = detailsResponse.data;
+    const detailsData = dbData;
 
     if (!detailsData || !detailsData.id) {
       throw new Error(`No data found for ID: ${id}`);
@@ -368,7 +362,6 @@ exports.getById = async (getPricePerformanceStatsDto) => {
       result.error = error.message;
     }
   }
-
   return result;
 };
 
@@ -420,6 +413,18 @@ exports.addLoserGainers = async (addLoserGainers, result = {}) => {
     return result;
   }
 };
+exports.addTrending = async (addTrending, result = {}) => {
+  try {
+    result.data = await CoinsTrending.insertMany(addTrending, {
+      ordered: false,
+      rawResult: false,
+    });
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
 exports.addMostVisited = async (addMostVisited, result = {}) => {
   try {
     console.log("addMostVisited");
@@ -446,6 +451,15 @@ exports.deleteTopAndLoserGainers = async (result = {}) => {
 exports.deleteMostVisited = async (result = {}) => {
   try {
     await Promise.all([CoinsMostVisited.deleteMany({})]);
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.deleteTrending = async (result = {}) => {
+  try {
+    await Promise.all([CoinsTrending.deleteMany({})]);
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -495,6 +509,62 @@ exports.getTopGainers = async (getTopGainersDto, result = {}) => {
         .limit(limit)
         .skip((offset - 1) * limit),
       CoinsGainer.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getMostVisited = async (getMostVisitedDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getMostVisitedDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsMostVisited.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsMostVisited.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTrending = async (getTrendingDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTrendingDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsTrending.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsTrending.countDocuments(filter),
     ]);
 
     result.data = {

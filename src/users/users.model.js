@@ -11,7 +11,7 @@ const usersSchema = new mongoose.Schema(
       // unique: true,
       sparse: true,
     },
-    name: {
+    userName: {
       type: String,
       maxlength: 128,
       index: true,
@@ -56,121 +56,6 @@ const usersSchema = new mongoose.Schema(
       trim: true,
       unique: true,
       sparse: true,
-    },
-    totalSurvey: {
-      type: Number,
-      default: 0,
-    },
-    totalDispute: {
-      type: Number,
-      default: 0,
-    },
-    totalDisputeRewards: {
-      type: Number,
-      default: 0,
-    },
-    totalDisputeRewardsAvaliable: {
-      type: Number,
-      default: 0,
-    },
-    refundAmount: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewards: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewardsClaimed: {
-      type: Number,
-      default: 0,
-    },
-    totalDisputeRewardsClaimed: {
-      type: Number,
-      default: 0,
-    },
-    totalDisputeRewardsWithdraw: {
-      type: Number,
-      default: 0,
-    },
-    totalExternalResource: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewards: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewardsClaimed: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequests: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequestsAnswered: {
-      type: Number,
-      default: 0,
-    },
-    totalDisputeAnswered: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyAnswered: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewardsWithdraw: {
-      type: Number,
-      default: 0,
-    },
-    totalExternalResourceAnswered: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequestsRewards: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequestsRewardsClaimed: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequestsRewardsWithdraw: {
-      type: Number,
-      default: 0,
-    },
-    totalDataRequestsRewardsAvaliable: {
-      type: Number,
-      default: 0,
-    },
-
-    totalExternalResourceRewardsClaimed: {
-      type: Number,
-      default: 0,
-    },
-    totalExternalResourceRewards: {
-      type: Number,
-      default: 0,
-    },
-    totalExternalResourceRewardsWithdraw: {
-      type: Number,
-      default: 0,
-    },
-    totalExternalResourceRewardsAvaliable: {
-      type: Number,
-      default: 0,
-    },
-    totalSurveyRewardsAvaliable: {
-      type: Number,
-      default: 0,
-    },
-    externalUserId: {
-      type: String,
-      unique: true,
-      required: true,
-      default: () => mongoose.Types.ObjectId().toString(), // Generate a unique ID
     },
     isEmailVerified: { type: Boolean, default: false },
     isKycVerified: { type: Boolean, default: false },
