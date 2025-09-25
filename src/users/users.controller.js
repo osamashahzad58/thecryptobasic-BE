@@ -42,12 +42,27 @@ exports.profile = async function (req, res, next) {
   }
 };
 
+exports.getUserWatchlist = async function (req, res, next) {
+  try {
+    const { id: userId } = req.user;
+    const result = await usersService.getUserWatchlist({ userId });
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User watchlist data",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+
 exports.sendOtp = async (req, res, next) => {
   try {
     const sendOtpDto = {
       id: req.user.id,
       role: req.user.role,
-      walletAddress: req.user.walletAddress,
       ...req.body,
     };
     const result = await usersService.sendOtp(sendOtpDto);
@@ -101,21 +116,6 @@ exports.verifyOtp = async (req, res, next) => {
     return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Otp verified successfully",
-    });
-  } catch (ex) {
-    next(ex);
-  }
-};
-exports.getUserWatchlist = async function (req, res, next) {
-  try {
-    const { id: userId } = req.user;
-    const result = await usersService.getUserWatchlist({ userId });
-    if (result.ex) throw result.ex;
-
-    res.status(StatusCodes.OK).json({
-      statusCode: StatusCodes.OK,
-      message: "User watchlist data",
-      data: result.data,
     });
   } catch (ex) {
     next(ex);

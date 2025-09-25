@@ -134,7 +134,7 @@ exports.sendEmail = async function (sendEmailPayload, result = {}) {
       to: String(receiverEmail).trim(),
       subject: "Your OTP Code",
       apiKey: configs.elasticEmail.apiKey,
-      from: "support@thecryptobasic.com",
+      from: "hashim@thecryptobasic.com",
       fromName: "TheCryptoBasic",
       template: configs.elasticEmail.sendOtp,
       merge_otpCode: codeVerify,
@@ -158,7 +158,7 @@ exports.sendEmail = async function (sendEmailPayload, result = {}) {
     );
 
     result.response = response.data;
-
+    console.log(response.data, "response.data");
     // Check response success
     if (!response.data.success) {
       throw new Error(

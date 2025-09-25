@@ -60,13 +60,8 @@ exports.signin = async (signInDto, result = {}) => {
         },
         accessToken,
         refreshToken,
-        role,
-        kycVerified,
-        kycStatus,
-        isKycVerified,
       };
     }
-    console.log(result.data, "console.log(result.data)");
   } catch (ex) {
     result.ex = ex;
   } finally {

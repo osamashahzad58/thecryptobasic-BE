@@ -103,8 +103,8 @@ exports.createUser = async (createUserDto, result = {}) => {
 
 exports.sendOtp = async (sendOtpDto, result = {}) => {
   try {
-    const { email, id, walletAddress } = sendOtpDto;
-    const user = await User.findOne({ id, walletAddress, role: "user" });
+    const { email } = sendOtpDto;
+    const user = await User.findOne({ email, role: "user" });
     if (!user) {
       result.userNotFound = true;
       return;
@@ -114,10 +114,6 @@ exports.sendOtp = async (sendOtpDto, result = {}) => {
     //   user.email = email;
     //   await user.save();
     // }
-    if (email && user.email !== email) {
-      user.email = email;
-      await user.save();
-    }
 
     if (user?.isEmailVerified) {
       result.userAlreadyVerified = true;
