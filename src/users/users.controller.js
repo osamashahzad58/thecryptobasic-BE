@@ -61,8 +61,8 @@ exports.getUserWatchlist = async function (req, res, next) {
 exports.sendOtp = async (req, res, next) => {
   try {
     const sendOtpDto = {
-      id: req.user.id,
-      role: req.user.role,
+      // id: req.user.id,
+      // role: req.user.role,
       ...req.body,
     };
     const result = await usersService.sendOtp(sendOtpDto);
@@ -87,6 +87,7 @@ exports.sendOtp = async (req, res, next) => {
     return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Otp Send successfully",
+      data: result.data,
     });
   } catch (ex) {
     next(ex);
@@ -97,10 +98,35 @@ exports.verifyOtp = async (req, res, next) => {
   try {
     const verifyOtpDto = {
       id: req.user.id,
-      walletAddress: req.user.walletAddress,
       ...req.body,
     };
     const result = await usersService.verifyOtp(verifyOtpDto);
+
+    if (result.ex) throw result.ex;
+
+    if (result.userNotFound)
+      throw createError(StatusCodes.NOT_FOUND, "User not found");
+
+    if (result.optCodeIncorrect)
+      throw createError(StatusCodes.BAD_REQUEST, "Otp is incorrect");
+
+    if (result.otpExpired)
+      throw createError(StatusCodes.GONE, "Otp is expired");
+
+    return res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Otp verified successfully",
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.restPassword = async (req, res, next) => {
+  try {
+    const restPasswordDto = {
+      ...req.body,
+    };
+    const result = await usersService.restPassword(restPasswordDto);
 
     if (result.ex) throw result.ex;
 

@@ -40,11 +40,19 @@ router.post(
   ],
   usersController.verifyOtp
 );
+router.post(
+  "/restPassword",
+  [
+    // JWT.verifyAccessToken,
+    validate(usersValidation.restPassword, { keyByField: true }),
+  ],
+  usersController.restPassword
+);
 
 router.post(
   "/send-otp",
   [
-    JWT.verifyAccessToken,
+    // JWT.verifyAccessToken,
     validate(usersValidation.sendOtp, { keyByField: true }),
   ],
   usersController.sendOtp

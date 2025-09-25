@@ -1,16 +1,8 @@
 const mongoose = require("mongoose");
-const configs = require("../../configs");
 const bcrypt = require("bcrypt");
-const { KYC_STATUS } = require("./constants/users.constants");
+
 const usersSchema = new mongoose.Schema(
   {
-    walletAddress: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      // unique: true,
-      sparse: true,
-    },
     userName: {
       type: String,
       maxlength: 128,
@@ -20,7 +12,6 @@ const usersSchema = new mongoose.Schema(
     password: {
       type: String,
       trim: true,
-      sparse: true,
     },
     role: {
       type: String,
@@ -30,11 +21,11 @@ const usersSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
+      unique: true, // sirf email unique
       sparse: true,
     },
     otp: {
-      type: String,
-      unique: true,
+      type: String, // temporary, no unique constraint
       sparse: true,
     },
     otpExpiresTime: {
@@ -54,8 +45,7 @@ const usersSchema = new mongoose.Schema(
       type: String,
       index: true,
       trim: true,
-      unique: true,
-      sparse: true,
+      sparse: true, // ek device ke multiple users ka issue avoid karne ke liye unique hata diya
     },
     isEmailVerified: { type: Boolean, default: false },
     isKycVerified: { type: Boolean, default: false },
@@ -67,18 +57,20 @@ const usersSchema = new mongoose.Schema(
   }
 );
 
-usersSchema.index({ walletAddress: 1, role: 1, email: 1 }, { unique: true });
+// Email unique index explicitly
+usersSchema.index({ email: 1 }, { unique: true, sparse: true });
 
+// password hashing middleware
 usersSchema.pre("save", async function (next) {
-  // check if password is present and is modified.
   if (this.password && this.isModified("password")) {
-    // call your hashPassword method here which will return the hashed password.
     this.password = await bcrypt.hash(this.password, 10);
   }
   next();
 });
 
+// compare password method
 usersSchema.methods.isPasswordValid = function (password) {
   return bcrypt.compareSync(password, this.password);
 };
+
 module.exports = mongoose.model("Users", usersSchema);

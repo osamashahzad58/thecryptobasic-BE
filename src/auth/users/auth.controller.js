@@ -40,20 +40,18 @@ exports.signup = async (req, res, next) => {
 
     if (result.hasConflict) {
       const conflictStatus = StatusCodes.CONFLICT;
-      const conflictMessage = result.conflictMessage;
-      const conflictField = result.conflictField;
-
       return res.status(conflictStatus).json({
         statusCode: conflictStatus,
-        message: conflictMessage,
-        conflictField: conflictField,
-        existingUser: result.existingUser, // Include existing user data for better information
+        message: result.conflictMessage,
+        conflictField: result.conflictField,
+        existingUser: result.existingUser, // agar service se mile
       });
     }
 
     return res.status(StatusCodes.CREATED).json({
       statusCode: StatusCodes.CREATED,
-      message: "Account Is Created Successfully",
+      message: "Account is created successfully",
+      data: result.data, // ab isme accessToken aur refreshToken dono honge
     });
   } catch (ex) {
     next(ex);

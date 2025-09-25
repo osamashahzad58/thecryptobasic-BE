@@ -5,24 +5,30 @@ const configs = require("../../../configs");
 const JWT = require("../../common/auth/jwt");
 const redisClient = require("../../../helpers/redis");
 const USERS_EVENTS = require("../../users/constants/users.events.constants");
+const EMAIL_VERIFICATION_EVENTS = require("../../users/constants/users.events.constants");
 const eventEmitter = require("../../common/events/events.event-emitter");
 const CONSTANTS = require("../../common/constants/constants");
 const cryptoUtils = require("../../common/crypto/crypto.util");
 const { googleAuthenticate } = require("../../common/google/googleAuth");
 
+const otpGenerator = require("otp-generator");
+
 exports.signin = async (signInDto, result = {}) => {
   try {
-    const { email, password, rememberMe } = signInDto;
+    const { email, username, password, rememberMe } = signInDto;
+    console.log(signInDto, "signInDto");
 
-    const response = await usersService.findUserByEmailOrUsername({ email });
+    const response = await usersService.findUserByEmailOrUsername({
+      email,
+    });
     if (response.ex) throw response.ex;
     const user = response.data;
 
     if (user && (await user.isPasswordValid(password))) {
-      // extract safe values from user
+      // extract safe values
       const { password, ...safeUserData } = user._doc;
 
-      // generate access & refresh token
+      // generate tokens
       const [accessToken, refreshToken] = await Promise.all([
         JWT.signToken(
           {
@@ -42,22 +48,17 @@ exports.signin = async (signInDto, result = {}) => {
         ),
       ]);
 
-      // store refresh token in redis
-      // await redisClient.set(safeUserData._id, refreshToken, {
-      //   EX: configs.jwt.refreshToken.redisTTL,
-      // });
-      rememberMe
-        ? await redisClient.set(safeUserData._id.toString(), refreshToken, {
-            EX: configs.jwt.refreshToken.redisRemeberMeTTL,
-          })
-        : await redisClient.set(safeUserData._id.toString(), refreshToken, {
-            EX: configs.jwt.refreshToken.redisTTL,
-          });
+      // save refresh token
+      const ttl = rememberMe
+        ? configs.jwt.refreshToken.redisRemeberMeTTL
+        : configs.jwt.refreshToken.redisTTL;
+
+      await redisClient.set(safeUserData._id.toString(), refreshToken, {
+        EX: ttl,
+      });
 
       result.data = {
-        user: {
-          ...safeUserData,
-        },
+        user: safeUserData,
         accessToken,
         refreshToken,
       };
@@ -68,13 +69,74 @@ exports.signin = async (signInDto, result = {}) => {
     return result;
   }
 };
+
+// exports.signup = async (signUpDto, result = {}) => {
+//   try {
+//     const response = await usersService.createUser(signUpDto);
+
+//     if (response.ex) throw response.ex;
+
+//     result.data = response.data;
+//   } catch (ex) {
+//     if (
+//       ex.name === CONSTANTS.DATABASE_ERROR_NAMES.MONGO_SERVER_ERROR &&
+//       ex.code === CONSTANTS.DATABASE_ERROR_CODES.UNIQUE_VIOLATION
+//     ) {
+//       const uniqueViolaterMessage = ex.message.split("{ ")[1];
+//       const uniqueViolaterField = uniqueViolaterMessage.split(":")[0];
+//       result.conflictMessage = `A user with ${uniqueViolaterField} already exist`;
+//       result.conflictField = uniqueViolaterField;
+//       result.hasConflict = true;
+//     } else {
+//       result.ex = ex;
+//     }
+//   } finally {
+//     return result;
+//   }
+// };
 exports.signup = async (signUpDto, result = {}) => {
   try {
     const response = await usersService.createUser(signUpDto);
 
     if (response.ex) throw response.ex;
 
-    result.data = response.data;
+    const user = response.data;
+
+    // safe user data
+    const safeUserData = {
+      _id: user._id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      otpExpiresTime: user.otpExpiresTime, // add here
+    };
+
+    // generate access & refresh token
+    const [accessToken, refreshToken] = await Promise.all([
+      JWT.signToken(
+        {
+          id: safeUserData._id,
+          email: safeUserData.email,
+          role: safeUserData.role,
+        },
+        JWT_TOKEN_TYPES.ACCESS_TOKEN
+      ),
+      JWT.signToken(
+        {
+          id: safeUserData._id,
+          email: safeUserData.email,
+          role: safeUserData.role,
+        },
+        JWT_TOKEN_TYPES.REFRESH_TOKEN
+      ),
+    ]);
+
+    // merge tokens + otpExpiresTime inside data
+    result.data = {
+      ...safeUserData,
+      accessToken,
+      refreshToken,
+    };
   } catch (ex) {
     if (
       ex.name === CONSTANTS.DATABASE_ERROR_NAMES.MONGO_SERVER_ERROR &&
@@ -92,6 +154,7 @@ exports.signup = async (signUpDto, result = {}) => {
     return result;
   }
 };
+
 // exports.registerUser = async (registersDto, result = {}) => {
 //   try {
 //     const { walletAddress } = registersDto;
@@ -420,8 +483,28 @@ exports.refreshToken = async (refreshTokenDto, result = {}) => {
 exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
   try {
     const { email } = forgetPasswordDto;
-    const response = await usersService.findUserByEmail(email);
+    console.log(forgetPasswordDto, "forgetPasswordDto");
 
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCaseAlphabets: false,
+      upperCase: false,
+      lowerCaseAlphabets: false,
+      lowerCase: false,
+      specialChars: false,
+    });
+    const user = await User.findOne({ email, role: "user" });
+    if (!user) {
+      result.userNotFound = true;
+      return;
+    }
+
+    const response = await usersService.findUserByEmail(email);
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.otp = otp;
+    user.otpExpiresTime = expiryTime;
+    await user.save();
     if (response.ex) throw response.ex;
 
     if (!response.data) {
@@ -429,17 +512,15 @@ exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
     } else {
       result.userExist = true;
       const user = response.data;
-      user.passwordResetToken = await JWT.signPasswordResetToken();
       await user.save();
-
-      const passwordResetLink = `${configs.frontEndUrl}/reset-password?token=${user.passwordResetToken}`;
-
-      eventEmitter.emit(USERS_EVENTS.FORGOT_PASSWORD, {
-        receiverEmail: user.email,
-        name: user.name,
-        passwordResetLink,
-      });
     }
+
+    // Trigger email event
+    eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.FORGOT_PASSWORD, {
+      receiverEmail: email,
+      name: user?.userName,
+      codeVerify: otp,
+    });
   } catch (ex) {
     result.ex = ex;
   } finally {

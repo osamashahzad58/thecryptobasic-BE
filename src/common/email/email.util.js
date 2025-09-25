@@ -41,73 +41,53 @@ exports.sendPasswordResetEmail = async function (
   result = {}
 ) {
   try {
-    const { receiverEmail, name, passwordResetLink } =
-      resetPasswordEmailPayload;
+    const { receiverEmail, name, codeVerify } = resetPasswordEmailPayload;
 
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.passwordResetEmailTemplateId,
-      dynamicTemplateData: {
-        name,
-        passwordResetLink,
-      },
+    // Validate input
+    if (
+      !receiverEmail ||
+      typeof receiverEmail !== "string" ||
+      !receiverEmail.includes("@")
+    ) {
+      throw new Error("Invalid recipient email address.");
+    }
+
+    if (!codeVerify) {
+      throw new Error("OTP Code is required.");
+    }
+
+    const emailPayload = {
+      to: String(receiverEmail).trim(),
+      subject: "Your OTP Code",
+      apiKey: configs.elasticEmail.apiKey,
+      from: "hashim@thecryptobasic.com",
+      fromName: "TheCryptoBasic",
+      template: configs.elasticEmail.passwordResetTemplate,
+      merge_otpCode: codeVerify,
+      merge_userName: name,
+      isTransactional: true,
     };
-    const res = await sgMail.send(msg);
-  } catch (ex) {
-    result.ex = ex;
-  } finally {
-    return result;
-  }
-};
+    console.log(
+      emailPayload,
+      configs.elasticEmail.apiKey,
+      configs.elasticEmail.sendOtp,
+      "emailPayload"
+    );
 
-exports.sendPasswordUpdateSuccessEmail = async function (
-  passwordUpdateDto,
-  result = {}
-) {
-  try {
-    const { receiverEmail, name } = passwordUpdateDto;
+    const response = await axios.post(
+      "https://api.elasticemail.com/v2/email/send",
+      qs.stringify(emailPayload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
 
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.passwordResetSuccessEmailTemplateId,
-      dynamicTemplateData: {
-        name,
-      },
-    };
-    const res = await sgMail.send(msg);
+    result.response = response.data;
+    console.log(response.data, "response.data");
   } catch (ex) {
-    result.ex = ex;
-  } finally {
-    return result;
-  }
-};
-exports.sendAboutUsEmail = async (aboutUsEmailPayload, result = {}) => {
-  try {
-    const { firstName, lastName, email, message } = aboutUsEmailPayload;
-
-    const msg = {
-      to: configs.sendgrid.adminEmailAddress,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.aboutUsEmailTemplateId,
-      dynamicTemplateData: {
-        name: firstName + " " + lastName,
-        email: email,
-        message: message,
-      },
-    };
-    const res = await sgMail.send(msg);
-  } catch (ex) {
+    console.error("Elastic Email Error:", ex.response?.data || ex.message);
     result.ex = ex;
   } finally {
     return result;
