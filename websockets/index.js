@@ -42,7 +42,6 @@ module.exports.initServer = async (server) => {
       messageHandler(io, socket);
     });
   } catch (ex) {
-    console.log(ex);
     process.exit(-1);
   }
 };

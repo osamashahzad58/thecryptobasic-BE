@@ -43,7 +43,7 @@ router.post(
 router.post(
   "/restPassword",
   [
-    // JWT.verifyAccessToken,
+    JWT.verifyAccessToken,
     validate(usersValidation.restPassword, { keyByField: true }),
   ],
   usersController.restPassword

@@ -13,6 +13,10 @@ const usersSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    picture: {
+      type: String,
+      trim: true,
+    },
     role: {
       type: String,
       default: "user",

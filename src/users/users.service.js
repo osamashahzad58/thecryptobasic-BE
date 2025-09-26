@@ -61,7 +61,6 @@ exports.profile = async (profileDto, result = {}) => {
 // const mongoose = require("mongoose");
 exports.createUser = async (createUserDto, result = {}) => {
   try {
-    // Add default role
     const userPayload = {
       ...createUserDto,
       role: "user",
@@ -80,8 +79,7 @@ exports.createUser = async (createUserDto, result = {}) => {
       specialChars: false,
     });
 
-    // Expiry time (10 minutes)
-    const expiryTime = new Date(Date.now() + 1 * 60 * 1000);
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000);
     savedUser.otp = otp;
     savedUser.otpExpiresTime = expiryTime;
     await savedUser.save();
@@ -92,15 +90,13 @@ exports.createUser = async (createUserDto, result = {}) => {
       codeVerify: otp,
     });
 
-    // remove only password & otp
-    const { password, otp: _otp, ...safeUserData } = savedUser.toObject();
-
-    result.data = safeUserData;
+    // Normalize _id → id
+    const { password, otp: _otp, _id, ...rest } = savedUser.toObject();
+    result.data = { id: _id.toString(), ...rest };
   } catch (ex) {
-    console.error("[createUser] Error occurred:", ex);
     result.ex = ex;
+    result.data = null; // make sure it exists
   } finally {
-    console.log("[createUser] Process finished.");
     return result;
   }
 };
@@ -192,7 +188,6 @@ exports.sendOtp = async (sendOtpDto, result = {}) => {
 exports.verifyOtp = async (verifyOtpDto, result = {}) => {
   try {
     const { id, otp } = verifyOtpDto;
-    console.log(verifyOtpDto, "verifyOtpDto");
 
     const user = await User.findOne({
       _id: new mongoose.Types.ObjectId(id),
@@ -202,8 +197,6 @@ exports.verifyOtp = async (verifyOtpDto, result = {}) => {
       result.userNotFound = true;
       return;
     }
-
-    console.log("Saved OTP:", user.otp, "Provided OTP:", otp);
 
     if (String(user.otp) !== String(otp)) {
       result.otpCodeIncorrect = true;
@@ -424,7 +417,6 @@ exports.findUserByEmail = async (email, result = {}) => {
   try {
     console.log(email, "email");
     result.data = await User.findOne({ email, role: "user" });
-    console.log(result.data, "result.data");
   } catch (ex) {
     result.ex = ex;
   } finally {

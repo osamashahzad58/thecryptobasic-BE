@@ -176,6 +176,7 @@ exports.forgetPassword = async (req, res, next) => {
     return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Password reset link sent via email",
+      data: result.data,
     });
   } catch (ex) {
     next(ex);
@@ -229,7 +230,7 @@ exports.resetPassword = async (req, res, next) => {
 exports.signupWithGoogle = async (req, res, next) => {
   try {
     const { code } = req.body; // frontend se "authorization_code" bhejna hai
-
+    console.log(code, "code");
     if (!code) {
       throw createError(
         StatusCodes.BAD_REQUEST,

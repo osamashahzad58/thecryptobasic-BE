@@ -58,7 +58,7 @@ exports.signin = async (signInDto, result = {}) => {
       });
 
       result.data = {
-        user: safeUserData,
+        ...safeUserData,
         accessToken,
         refreshToken,
       };
@@ -102,20 +102,28 @@ exports.signup = async (signUpDto, result = {}) => {
 
     const user = response.data;
 
+    // Normalize _id to id (important for JWT)
+    const userId = user.id || user._id?.toString();
+    if (!userId) {
+      throw new Error(
+        `User object is invalid. Missing id. Got: ${JSON.stringify(user)}`
+      );
+    }
+
     // safe user data
     const safeUserData = {
-      _id: user._id,
+      id: userId,
       email: user.email,
       role: user.role,
       name: user.name,
-      otpExpiresTime: user.otpExpiresTime, // add here
+      otpExpiresTime: user.otpExpiresTime,
     };
 
     // generate access & refresh token
     const [accessToken, refreshToken] = await Promise.all([
       JWT.signToken(
         {
-          id: safeUserData._id,
+          id: safeUserData.id,
           email: safeUserData.email,
           role: safeUserData.role,
         },
@@ -123,7 +131,7 @@ exports.signup = async (signUpDto, result = {}) => {
       ),
       JWT.signToken(
         {
-          id: safeUserData._id,
+          id: safeUserData.id,
           email: safeUserData.email,
           role: safeUserData.role,
         },
@@ -144,11 +152,12 @@ exports.signup = async (signUpDto, result = {}) => {
     ) {
       const uniqueViolaterMessage = ex.message.split("{ ")[1];
       const uniqueViolaterField = uniqueViolaterMessage.split(":")[0];
-      result.conflictMessage = `A user with ${uniqueViolaterField} already exist`;
+      result.conflictMessage = `A user with ${uniqueViolaterField} already exists`;
       result.conflictField = uniqueViolaterField;
       result.hasConflict = true;
     } else {
       result.ex = ex;
+      console.log(ex, "exxxx");
     }
   } finally {
     return result;
@@ -482,7 +491,7 @@ exports.refreshToken = async (refreshTokenDto, result = {}) => {
 
 exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
   try {
-    const { email } = forgetPasswordDto;
+    const { email, rememberMe = false } = forgetPasswordDto;
     console.log(forgetPasswordDto, "forgetPasswordDto");
 
     const otp = otpGenerator.generate(6, {
@@ -504,7 +513,45 @@ exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
     const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     user.otp = otp;
     user.otpExpiresTime = expiryTime;
-    await user.save();
+    user.isEmailVerified = false;
+    const data = await user.save();
+
+    // generate tokens
+    const [accessToken, refreshToken] = await Promise.all([
+      JWT.signToken(
+        {
+          id: data._id,
+          email: data?.email,
+          role: data.role,
+        },
+        JWT_TOKEN_TYPES.ACCESS_TOKEN
+      ),
+      JWT.signToken(
+        {
+          id: data._id,
+          email: data?.email,
+          role: data.role,
+        },
+        JWT_TOKEN_TYPES.REFRESH_TOKEN
+      ),
+    ]);
+
+    // save refresh token
+    const ttl = rememberMe
+      ? configs.jwt.refreshToken.redisRemeberMeTTL
+      : configs.jwt.refreshToken.redisTTL;
+
+    await redisClient.set(data._id.toString(), refreshToken, {
+      EX: ttl,
+    });
+
+    result.data = {
+      email: data.email,
+      otpExpiresTime: data.otpExpiresTime,
+      accessToken,
+      refreshToken,
+      forget: true,
+    };
     if (response.ex) throw response.ex;
 
     if (!response.data) {
@@ -629,27 +676,51 @@ exports.signupWithGoogle = async (code, result = {}) => {
   try {
     const { payload } = await googleAuthenticate(code);
     const { email, name, picture } = payload;
+    console.log(payload, "payload670");
 
-    let user = await usersService.findByEmail(email);
+    let userResult = await usersService.findUserByEmail(email);
 
+    // normalize: remove the { data: null } problem
+    let user = userResult?.data || userResult || null;
+    if (user && user.data === null) {
+      user = null;
+    }
+    console.log(user, "user");
+
+    // create if not exists
     if (!user) {
-      user = await usersService.create({
+      const createdUser = await usersService.createUser({
         email,
         name,
         profilePicture: picture,
         provider: "google",
       });
+      user = createdUser?.data || createdUser || null;
     }
 
-    const token = JWT.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+    if (!user) {
+      throw new Error("User creation failed, got null user");
+    }
+
+    // normalize mongoose doc
+    const plainUser = user.toObject?.() || user._doc || user;
+    const userId = plainUser.id || plainUser._id?.toString();
+    if (!userId) {
+      throw new Error(
+        `User object is invalid. Got: ${JSON.stringify(plainUser)}`
+      );
+    }
+
+    const accessToken = await JWT.signToken(
+      { id: userId, email: plainUser.email },
+      JWT_TOKEN_TYPES.ACCESS_TOKEN,
+      true
     );
 
-    result.data = { user, token };
+    result.data = { ...plainUser, accessToken };
   } catch (ex) {
     result.ex = ex;
+    result.data = null;
   } finally {
     return result;
   }

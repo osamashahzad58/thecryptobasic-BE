@@ -8,7 +8,6 @@ const CONSTANTS = require("../common/constants/constants");
 exports.createCode = async (createCodesDto, result = {}) => {
   try {
     let { email } = createCodesDto;
-    console.log(createCodesDto, "createCodesDto");
     const otpCode = randomNumber.generator({
       min: 100000,
       max: 999999,
@@ -25,7 +24,6 @@ exports.createCode = async (createCodesDto, result = {}) => {
         { $set: { otpCode } },
         { new: true }
       );
-      console.log(updateOtp, "updateOtp");
 
       result.data = updateOtp;
     } else {
@@ -33,7 +31,6 @@ exports.createCode = async (createCodesDto, result = {}) => {
         email,
         otpCode,
       });
-      console.log(emailVerification, "emailVerification");
       result.data = emailVerification;
     }
     eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.VERIFICATION_CODE, {
@@ -51,7 +48,6 @@ exports.createCode = async (createCodesDto, result = {}) => {
 exports.verifyEmailCode = async (verifyEmailCodesDto, result = {}) => {
   try {
     const { email, emailVerificationCode } = verifyEmailCodesDto;
-    console.log(verifyEmailCodesDto, "verifyEmailCodesDto");
 
     // Find email verification record in MongoDB
 
@@ -60,7 +56,6 @@ exports.verifyEmailCode = async (verifyEmailCodesDto, result = {}) => {
       otpCode: emailVerificationCode,
       // verificationCodeTimestamp: { $gt: new Date() }, // Using MongoDB's $gt operator for greater than comparison
     });
-    console.log(emailVerification, "emailVerification");
     // If email verification record found
     if (emailVerification) {
       result.data = { tokenVerified: true };
