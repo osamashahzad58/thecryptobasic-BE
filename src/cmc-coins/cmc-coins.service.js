@@ -3,6 +3,7 @@ const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const CmcCoinsNew = require("./models/cmc-new.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
 const CoinsTrending = require("./models/cmc-trending.model");
 const CoinsGainer = require("./models/cmc-topGainners.model");
@@ -425,6 +426,22 @@ exports.addTrending = async (addTrending, result = {}) => {
     return result;
   }
 };
+exports.addNewTokens = async (coins) => {
+  try {
+    console.log("Inserting:", coins.length, "new tokens");
+    const inserted = await CmcCoinsNew.insertMany(coins, {
+      ordered: false, // skip duplicates instead of failing
+    });
+    console.log("Inserted tokens:", inserted.length);
+    return inserted;
+  } catch (ex) {
+    console.error("Error in addNewTokens:", ex.message);
+    if (ex.writeErrors) {
+      console.error("Write errors:", ex.writeErrors);
+    }
+    throw ex;
+  }
+};
 exports.addMostVisited = async (addMostVisited, result = {}) => {
   try {
     console.log("addMostVisited");
@@ -460,6 +477,15 @@ exports.deleteMostVisited = async (result = {}) => {
 exports.deleteTrending = async (result = {}) => {
   try {
     await Promise.all([CoinsTrending.deleteMany({})]);
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.deleteNewTokens = async (result = {}) => {
+  try {
+    await Promise.all([CoinsTrending.deleteNewTokens({})]);
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -578,6 +604,69 @@ exports.getTrending = async (getTrendingDto, result = {}) => {
     return result;
   }
 };
+exports.getNew = async (getTrendingDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTrendingDto;
+    console.log(getTrendingDto, "getTrendingDto::::::::");
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsTrending.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsTrending.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getExploreNew = async (getTrendingDto, result = {}) => {
+  try {
+    const limit = Number(getTrendingDto.limit) || 20;
+    const offset = Number(getTrendingDto.offset) || 1;
+
+    console.log({ limit, offset }, "parsed pagination values");
+
+    const coins = await CmcCoinsNew.aggregate([
+      {
+        $lookup: {
+          from: "cmccoins", // 👈 same as CmcCoinsModel ka collection name
+          localField: "coinId",
+          foreignField: "coinId",
+          as: "fullData",
+        },
+      },
+      { $skip: (offset - 1) * limit },
+      { $limit: limit },
+    ]);
+
+    const count = await CmcCoinsNew.countDocuments();
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    console.error("Error in getExploreNew:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
 exports.getSearch = async (getSearchDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection, search } = getSearchDto;

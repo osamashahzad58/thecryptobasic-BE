@@ -148,7 +148,7 @@ async function cmcList() {
     const listingsRes = await axios.get(
       "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
       {
-        params: { start: "1", limit: "3", convert: "USD" },
+        params: { start: "1", limit: "3000", convert: "USD" },
         headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
       }
     );
@@ -168,7 +168,7 @@ async function cmcList() {
     const infoData = infoRes.data.data;
 
     for (const coin of coins) {
-      const sparklineUrl = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
+      // const sparklineUrl = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
 
       // Snapshot for chart
       const todayData = {
@@ -234,7 +234,7 @@ async function cmcList() {
 
         categories: infoData[coin.id]?.tags || [],
         website: infoData[coin.id]?.urls?.website || [],
-        sparkline_7d: sparklineUrl,
+        // sparkline_7d: sparklineUrl,
 
         high_24h: high_24h || null,
         low_24h: low_24h || null,

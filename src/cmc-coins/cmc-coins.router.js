@@ -94,6 +94,16 @@ router.get(
   cmcCoinsController.getTrending
 );
 router.get(
+  "/New",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getNew
+);
+router.get(
+  "/explore/new",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getExploreNew
+);
+router.get(
   "/TopGainers",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTopGainers

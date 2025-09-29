@@ -236,6 +236,40 @@ exports.getTrending = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getNew = async (req, res, next) => {
+  try {
+    const getTrendingDto = req.query;
+    console.log(req.query, "req.query");
+    const result = await cmcCoinsService.getNew(getTrendingDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get New Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getExploreNew = async (req, res, next) => {
+  try {
+    const getTrendingDto = req.query;
+    console.log(req.query, "req.query");
+    const result = await cmcCoinsService.getExploreNew(getTrendingDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get New Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getSearch = async (req, res, next) => {
   try {
     const getSearchDto = req.query;
