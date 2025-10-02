@@ -485,13 +485,16 @@ exports.deleteTrending = async (result = {}) => {
 };
 exports.deleteNewTokens = async (result = {}) => {
   try {
-    await Promise.all([CoinsTrending.deleteNewTokens({})]);
+    const deletionResult = await CmcCoinsNew.deleteMany({});
+    console.log(deletionResult?.length ?? 0, "deletionResult ::::::::"); // safely logs length or 0
+    result.data = deletionResult;
   } catch (ex) {
     result.ex = ex;
   } finally {
     return result;
   }
 };
+
 exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection } = getAllCryptoDto;
@@ -520,6 +523,53 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
     return result;
   }
 };
+exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection, skipCoinId } =
+      getSkipCoinIdDto;
+
+    // filter set
+    const filter = {};
+    if (skipCoinId) {
+      filter.coinId = { $ne: skipCoinId.toString() }; // skip that coinId
+    }
+
+    // sort set
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    // sirf required fields select karna
+    const projection = {
+      name: 1,
+      price: 1,
+      logo: 1,
+      percent_change_1h: 1,
+      percent_change_24h: 1,
+      symbol: 1,
+      coinId: 1,
+      sparkline_7d: 1, // agar ye field DB me exist karti hai
+    };
+
+    const [coins, count] = await Promise.all([
+      CmcCoinsModel.find(filter, projection, { sort: sortOptions })
+        .limit(Number(limit))
+        .skip((offset - 1) * limit),
+      CmcCoinsModel.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
 exports.getTopGainers = async (getTopGainersDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection } = getTopGainersDto;

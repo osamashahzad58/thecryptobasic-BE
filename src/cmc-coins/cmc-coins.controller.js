@@ -188,6 +188,22 @@ exports.getAllCrypto = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getSkipCoinId = async (req, res, next) => {
+  try {
+    const getSkipCoinIdDto = req.query;
+    const result = await cmcCoinsService.getSkipCoinId(getSkipCoinIdDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get All Crypto Data",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getTopGainers = async (req, res, next) => {
   try {
     const getTopGainersDto = req.query;

@@ -18,6 +18,8 @@ const cmcCoinsSchema = new mongoose.Schema(
     percent_change_1h: { type: String, default: null },
     percent_change_24h: { type: String, default: null },
     percent_change_7d: { type: String, default: null },
+    market_cap_change_24h: { type: Number },
+    UCID: { type: Number },
     market_cap: { type: String, default: null },
     market_cap_dominance: { type: String, default: null },
     fully_diluted_market_cap: { type: String, default: null },
@@ -34,7 +36,8 @@ const cmcCoinsSchema = new mongoose.Schema(
     month_high: { type: Number, default: null },
     month_low: { type: Number, default: null },
     categories: { type: Array, default: [] },
-
+    audits: { type: Array, default: [] }, // NEW
+    wallets: { type: [String], default: [] }, // NEW
     socials: {
       twitter: { type: String, default: null },
       reddit: { type: String, default: null },

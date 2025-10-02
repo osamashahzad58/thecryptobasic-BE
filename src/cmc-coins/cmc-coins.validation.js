@@ -62,4 +62,17 @@ module.exports = {
       }),
     }),
   },
+  skipCoinId: {
+    query: Joi.object({
+      limit: Joi.number().positive().required(),
+      skipCoinId: Joi.string().required(), // coinId to skip
+      search: Joi.string().optional(),
+      offset: Joi.number().positive().required(),
+      orderField: Joi.string().valid("price", "createdAt"),
+      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
+        is: Joi.exist(),
+        then: Joi.required(),
+      }),
+    }),
+  },
 };

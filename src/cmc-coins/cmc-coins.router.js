@@ -79,6 +79,11 @@ router.get(
   cmcCoinsController.getAllCrypto
 );
 router.get(
+  "/skipCoinId",
+  [validate(cmcCoinsValidation.skipCoinId, { keyByField: true })],
+  cmcCoinsController.getSkipCoinId
+);
+router.get(
   "/TopLossers",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTopLossers

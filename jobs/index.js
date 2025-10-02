@@ -4,6 +4,7 @@ const fetchCMCTopGainersAndLosers = require("./cmc-Top-GainerLosers.job");
 const fetchCMCMostVisited = require("./cmc.mostVisited.job");
 const fetchCMCTrending = require("./cmc-Trending.job");
 const fetchCMCNewTokens = require("./cmc-new.job");
+const fetchCMCPrice = require("./cmc-price.job");
 const { initializeJob } = require("./coins-price-emitters");
 
 module.exports = function registerScheduledJobs(getIO) {
@@ -14,6 +15,7 @@ module.exports = function registerScheduledJobs(getIO) {
   // fetchCMCTopGainersAndLosers.initializeJob();
   // fetchCMCNewTokens.initializeJob();
   // fetchCMCMostVisited.initializeJob();
+  fetchCMCPrice.initializeJob();
 
   // sirf coin price emitter ka cron chalao
   initializeJob(getIO);
