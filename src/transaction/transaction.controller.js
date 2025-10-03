@@ -15,6 +15,8 @@ exports.create = async function (req, res, next) {
 
     if (result.hasConflict)
       throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+    if (result.nftNotFound)
+      throw createError(StatusCodes.NOT_FOUND, "portfolio not found");
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,

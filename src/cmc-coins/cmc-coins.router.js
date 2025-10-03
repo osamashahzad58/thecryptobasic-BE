@@ -68,6 +68,16 @@ router.get(
   cmcCoinsController.getById
 );
 router.get(
+  "/marketCapChartbyId",
+  [validate(cmcCoinsValidation.getById, { keyByField: true })],
+  cmcCoinsController.chartbyId
+);
+router.get(
+  "/volumeChartbyId",
+  [validate(cmcCoinsValidation.getById, { keyByField: true })],
+  cmcCoinsController.volumeChartbyId
+);
+router.get(
   "/getCoinByIdWithCMC",
   [validate(cmcCoinsValidation.getById, { keyByField: true })],
   cmcCoinsController.getCoinByIdWithCMC

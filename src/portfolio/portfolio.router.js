@@ -1,9 +1,8 @@
 const router = require("express").Router();
-
 const { validate } = require("express-validation");
-const transactionController = require("./transaction.controller");
+const portfolioController = require("./portfolio.controller");
 const JWT = require("../common/auth/jwt");
-const validation = require("./transaction.validation");
+const validation = require("./portfolio.validation");
 
 router.post(
   "/",
@@ -12,8 +11,8 @@ router.post(
     // JWT.verifyAccessToken,
     validate(validation.create, { keyByField: true }),
   ],
-  transactionController.create
+  portfolioController.create
 );
-router.get("/", [JWT.verifyAccessToken], transactionController.byUserId);
+// router.get("/", [JWT.verifyAccessToken], balanceController.byUserId);
 
 module.exports = router;

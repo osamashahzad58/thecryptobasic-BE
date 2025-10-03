@@ -365,6 +365,66 @@ exports.getById = async (getPricePerformanceStatsDto) => {
   }
   return result;
 };
+exports.chartbyId = async ({ id }) => {
+  const result = {};
+  try {
+    // Coin ke data lao
+    const dbData = await CmcCoinsModel.findOne(
+      { coinId: String(id) },
+      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
+    ).lean();
+
+    if (!dbData || !dbData.chart) {
+      throw new Error(`No chart data found for ID: ${id}`);
+    }
+
+    // chart ko filter karo -> sirf price, volume, timestamp rakho
+    const chart = dbData.chart.map((c) => ({
+      price: c.price,
+      market_cap: c.market_cap,
+      timestamp: c.timestamp,
+      // name: dbData.name,
+    }));
+
+    result.data = chart;
+    result.message = "Chart data fetched successfully";
+  } catch (ex) {
+    console.error("Error response:", ex.message);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};
+exports.volumeChartbyId = async ({ id }) => {
+  const result = {};
+  try {
+    // Coin ke data lao
+    const dbData = await CmcCoinsModel.findOne(
+      { coinId: String(id) },
+      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
+    ).lean();
+
+    if (!dbData || !dbData.chart) {
+      throw new Error(`No chart data found for ID: ${id}`);
+    }
+
+    // chart ko filter karo -> sirf price, volume, timestamp rakho
+    const chart = dbData.chart.map((c) => ({
+      price: c.price,
+      volume: c.volume,
+      timestamp: c.timestamp,
+      // name: dbData.name,
+    }));
+
+    result.data = chart;
+    result.message = "Chart data fetched successfully";
+  } catch (ex) {
+    console.error("Error response:", ex.message);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};
 
 exports.getCoinByIdWithCMC = async (getPricePerformanceStatsDto) => {
   const result = {};

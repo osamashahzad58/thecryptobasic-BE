@@ -1,13 +1,15 @@
 const Joi = require("joi");
+Joi.objectId = require("joi-objectid")(Joi);
 
 module.exports = {
   create: {
     body: Joi.object({
-      userId: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required(),
+      // userId: Joi.string()
+      //   .pattern(/^[0-9a-fA-F]{24}$/)
+      //   .required(),
 
       coinId: Joi.string().trim().required(),
+      portfolioId: Joi.objectId().required(),
 
       type: Joi.string().valid("buy", "sell", "transfer").required(),
 

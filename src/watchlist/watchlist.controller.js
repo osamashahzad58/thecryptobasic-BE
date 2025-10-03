@@ -47,3 +47,21 @@ exports.byUserId = async function (req, res, next) {
     next(ex);
   }
 };
+exports.toggle = async function (req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const coinId = req.query?.coinId;
+
+    const result = await watchlistService.toggle(userId, coinId);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: result.message,
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

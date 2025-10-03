@@ -152,6 +152,44 @@ exports.getById = async (req, res, next) => {
     next(ex);
   }
 };
+exports.chartbyId = async (req, res, next) => {
+  try {
+    const chartbyIdDto = { ...req.query };
+    const result = await cmcCoinsService.chartbyId(chartbyIdDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin chart data",
+      data: {
+        stats: result.data,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.volumeChartbyId = async (req, res, next) => {
+  try {
+    const chartbyIdDto = { ...req.query };
+    const result = await cmcCoinsService.volumeChartbyId(chartbyIdDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin chart data",
+      data: {
+        stats: result.data,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getCoinByIdWithCMC = async (req, res, next) => {
   try {
     const getCoinByIdWithCMCDto = { ...req.query };
