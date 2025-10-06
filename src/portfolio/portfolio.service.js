@@ -84,6 +84,11 @@ exports.getList = async (getListDto, result = {}) => {
           coinId: coinInfo.coinId || tx.coinId,
           logo: coinInfo.logo || null,
           price: coinInfo.price || 0, // assuming your Coin model has a price field
+          market_cap: coinInfo.market_cap || 0, // assuming your Coin model has a price field
+          percent_change_7d: coinInfo.percent_change_7d || 0, // assuming your Coin model has a price field
+          percent_change_24h: coinInfo.percent_change_24h || 0, // assuming your Coin model has a price field
+          percent_change_1h: coinInfo.percent_change_1h || 0, // assuming your Coin model has a price field
+          volume_change_24h: coinInfo.volume_change_24h || 0, // assuming your Coin model has a price field
         },
       });
 
