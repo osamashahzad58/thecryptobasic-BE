@@ -87,6 +87,8 @@ exports.byUserId = async (byUserIdDto, result = {}) => {
         coinInfo: {
           coinId: coinInfo.coinId || tx.coinId,
           logo: coinInfo.logo || null,
+          name: coinInfo.name || "",
+          symbol: coinInfo.symbol || "",
           price: Number(coinInfo.price || 0),
           market_cap: Number(coinInfo.market_cap || 0),
           percent_change_1h: Number(coinInfo.percent_change_1h || 0),
