@@ -13,6 +13,6 @@ router.post(
   ],
   portfolioController.create
 );
-// router.get("/", [JWT.verifyAccessToken], balanceController.byUserId);
+router.get("/", [JWT.verifyAccessToken], portfolioController.getList);
 
 module.exports = router;

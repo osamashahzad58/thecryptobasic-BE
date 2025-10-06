@@ -18,3 +18,17 @@ exports.create = async (createDto, result = {}) => {
     return result;
   }
 };
+exports.getList = async (getListDto, result = {}) => {
+  try {
+    const { userId } = getListDto;
+
+    const data = await Portfolio.find({
+      userId: mongoose.Types.ObjectId(userId),
+    });
+    result.data = data;
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
