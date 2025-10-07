@@ -53,6 +53,7 @@ module.exports = {
   AllCrypto: {
     query: Joi.object({
       limit: Joi.number().positive().required(),
+      id: Joi.string().trim().optional(),
       search: Joi.string().optional(),
       offset: Joi.number().positive().required(),
       orderField: Joi.string().valid("price"),

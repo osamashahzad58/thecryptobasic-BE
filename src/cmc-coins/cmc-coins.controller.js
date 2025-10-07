@@ -212,7 +212,11 @@ exports.getCoinByIdWithCMC = async (req, res, next) => {
 };
 exports.getAllCrypto = async (req, res, next) => {
   try {
-    const getAllCryptoDto = req.query;
+    const getAllCryptoDto = {
+      ...req.query,
+      userId: req.user?.id,
+    };
+
     const result = await cmcCoinsService.getAllCrypto(getAllCryptoDto);
 
     if (result.ex) throw result.ex;
@@ -228,7 +232,7 @@ exports.getAllCrypto = async (req, res, next) => {
 };
 exports.getSkipCoinId = async (req, res, next) => {
   try {
-    const getSkipCoinIdDto = req.query;
+    const getSkipCoinIdDto = { ...req.query, userId: req.user?.id };
     const result = await cmcCoinsService.getSkipCoinId(getSkipCoinIdDto);
 
     if (result.ex) throw result.ex;
@@ -293,7 +297,6 @@ exports.getTrending = async (req, res, next) => {
 exports.getNew = async (req, res, next) => {
   try {
     const getTrendingDto = req.query;
-    console.log(req.query, "req.query");
     const result = await cmcCoinsService.getNew(getTrendingDto);
 
     if (result.ex) throw result.ex;
@@ -310,7 +313,6 @@ exports.getNew = async (req, res, next) => {
 exports.getExploreNew = async (req, res, next) => {
   try {
     const getTrendingDto = req.query;
-    console.log(req.query, "req.query");
     const result = await cmcCoinsService.getExploreNew(getTrendingDto);
 
     if (result.ex) throw result.ex;

@@ -38,7 +38,6 @@ exports.createCode = async (createCodesDto, result = {}) => {
       codeVerify: otpCode,
     });
   } catch (ex) {
-    console.log(ex, "error");
     result.ex = ex;
   } finally {
     return result;

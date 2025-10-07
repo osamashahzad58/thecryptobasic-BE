@@ -37,12 +37,26 @@ const tokenSchema = new mongoose.Schema({
 
 const balanceSchema = new mongoose.Schema(
   {
+    isMe: {
+      type: Boolean,
+      default: false,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+      index: true,
+    },
     walletAddress: {
       type: String,
       required: true,
       trim: true,
       lowercase: true,
       unique: true, // one wallet per document
+    },
+    name: {
+      type: String,
+      required: true,
     },
     tokens: [tokenSchema], // array of tokens for this wallet
   },

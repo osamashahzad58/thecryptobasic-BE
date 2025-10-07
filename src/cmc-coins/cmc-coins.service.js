@@ -9,12 +9,11 @@ const CoinsTrending = require("./models/cmc-trending.model");
 const CoinsGainer = require("./models/cmc-topGainners.model");
 const CoinsMostVisited = require("./models/cmc-mostVisited.model");
 const CoinsStats = require("./models/cmc-stats.model");
+const Watchlist = require("../watchlist/watchlist.model");
 
 exports.create = async (createDto, result = {}) => {
   try {
-    console.log("getting list");
     const list = await CmcCoinsModel.create(createDto);
-    console.log("checked list");
 
     result.data = list;
   } catch (ex) {
@@ -488,11 +487,9 @@ exports.addTrending = async (addTrending, result = {}) => {
 };
 exports.addNewTokens = async (coins) => {
   try {
-    console.log("Inserting:", coins.length, "new tokens");
     const inserted = await CmcCoinsNew.insertMany(coins, {
       ordered: false, // skip duplicates instead of failing
     });
-    console.log("Inserted tokens:", inserted.length);
     return inserted;
   } catch (ex) {
     console.error("Error in addNewTokens:", ex.message);
@@ -504,7 +501,6 @@ exports.addNewTokens = async (coins) => {
 };
 exports.addMostVisited = async (addMostVisited, result = {}) => {
   try {
-    console.log("addMostVisited");
     result.data = await CoinsMostVisited.insertMany(addMostVisited);
   } catch (ex) {
     result.ex = ex;
@@ -557,25 +553,41 @@ exports.deleteNewTokens = async (result = {}) => {
 
 exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection } = getAllCryptoDto;
+    const { limit, offset, orderField, orderDirection, userId } =
+      getAllCryptoDto;
 
     const filter = {};
-
     const sortOptions = {
-      ...(orderField && { [orderField]: +orderDirection }),
+      ...(orderField && { [orderField]: +orderDirection || 1 }),
     };
 
+    // 1. Fetch coins and total count
     const [coins, count] = await Promise.all([
       CmcCoinsModel.find(filter, {}, { sort: sortOptions })
-        .limit(limit)
-        .skip((offset - 1) * limit),
+        .limit(Number(limit))
+        .skip((Number(offset) - 1) * Number(limit)),
       CmcCoinsModel.countDocuments(filter),
     ]);
 
+    let watchlistCoinIds = new Set();
+
+    // 2. If userId is provided, fetch user’s watchlist
+    if (userId) {
+      const watchlist = await Watchlist.find({ userId }).lean();
+      watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+    }
+
+    // 3. Attach isWatchlist to each coin
+    const coinsWithWatchlist = coins.map((coin) => ({
+      ...coin.toObject(),
+      isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+    }));
+
+    // 4. Final response
     result.data = {
       count,
-      coins,
       pages: Math.ceil(count / limit),
+      coins: coinsWithWatchlist,
     };
   } catch (ex) {
     result.ex = ex;
@@ -583,23 +595,30 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
     return result;
   }
 };
+
 exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection, skipCoinId } =
-      getSkipCoinIdDto;
+    const {
+      limit,
+      offset,
+      orderField,
+      orderDirection,
+      skipCoinId,
+      userId, // optional
+    } = getSkipCoinIdDto;
 
-    // filter set
+    // 1. Build filter
     const filter = {};
     if (skipCoinId) {
       filter.coinId = { $ne: skipCoinId.toString() }; // skip that coinId
     }
 
-    // sort set
+    // 2. Sorting
     const sortOptions = {
-      ...(orderField && { [orderField]: +orderDirection }),
+      ...(orderField && { [orderField]: +orderDirection || 1 }),
     };
 
-    // sirf required fields select karna
+    // 3. Projection (select only required fields)
     const projection = {
       name: 1,
       price: 1,
@@ -608,20 +627,36 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
       percent_change_24h: 1,
       symbol: 1,
       coinId: 1,
-      sparkline_7d: 1, // agar ye field DB me exist karti hai
+      sparkline_7d: 1,
     };
 
+    // 4. Fetch coins and count
     const [coins, count] = await Promise.all([
       CmcCoinsModel.find(filter, projection, { sort: sortOptions })
         .limit(Number(limit))
-        .skip((offset - 1) * limit),
+        .skip((Number(offset) - 1) * Number(limit)),
       CmcCoinsModel.countDocuments(filter),
     ]);
 
+    let watchlistCoinIds = new Set();
+
+    // 5. If userId provided, fetch user's watchlist
+    if (userId) {
+      const watchlist = await Watchlist.find({ userId }).lean();
+      watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+    }
+
+    // 6. Attach isWatchlist field
+    const coinsWithWatchlist = coins.map((coin) => ({
+      ...coin.toObject(),
+      isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+    }));
+
+    // 7. Return final result
     result.data = {
       count,
-      coins,
       pages: Math.ceil(count / limit),
+      coins: coinsWithWatchlist,
     };
   } catch (ex) {
     result.ex = ex;
@@ -747,8 +782,6 @@ exports.getExploreNew = async (getTrendingDto, result = {}) => {
     const limit = Number(getTrendingDto.limit) || 20;
     const offset = Number(getTrendingDto.offset) || 1;
 
-    console.log({ limit, offset }, "parsed pagination values");
-
     const coins = await CmcCoinsNew.aggregate([
       {
         $lookup: {
@@ -849,11 +882,9 @@ exports.getTopLossers = async (getTopLossersDto, result = {}) => {
 };
 exports.getTopstats = async ({ id }, result = {}) => {
   try {
-    console.log({ id });
     const question = await CoinsStats.findOne({
       _id: ObjectId(id),
     });
-    console.log(question, "question");
     result.data = question;
     result.success = true;
   } catch (ex) {

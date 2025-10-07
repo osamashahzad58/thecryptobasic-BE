@@ -85,7 +85,6 @@ exports.sendPasswordResetEmail = async function (
     );
 
     result.response = response.data;
-    console.log(response.data, "response.data");
   } catch (ex) {
     console.error("Elastic Email Error:", ex.response?.data || ex.message);
     result.ex = ex;
@@ -96,7 +95,6 @@ exports.sendPasswordResetEmail = async function (
 exports.sendEmail = async function (sendEmailPayload, result = {}) {
   try {
     const { receiverEmail, codeVerify } = sendEmailPayload;
-    console.log(sendEmailPayload, "sendEmailPayload 117");
     // Validate input
     if (
       !receiverEmail ||
@@ -120,12 +118,6 @@ exports.sendEmail = async function (sendEmailPayload, result = {}) {
       merge_otpCode: codeVerify,
       isTransactional: true,
     };
-    console.log(
-      emailPayload,
-      configs.elasticEmail.apiKey,
-      configs.elasticEmail.sendOtp,
-      "emailPayload"
-    );
 
     const response = await axios.post(
       "https://api.elasticemail.com/v2/email/send",
@@ -138,7 +130,6 @@ exports.sendEmail = async function (sendEmailPayload, result = {}) {
     );
 
     result.response = response.data;
-    console.log(response.data, "response.data");
     // Check response success
     if (!response.data.success) {
       throw new Error(
@@ -203,7 +194,6 @@ exports.sendEmailDataRequest = async function (
 exports.sendEmailDispute = async function (confirmEmailPayload, result = {}) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "emails:::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -252,7 +242,6 @@ exports.sendEmailDisputeWin = async function (
 ) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "sendEmailDisputeWin::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -309,7 +298,6 @@ exports.sendEmailDisputeLos = async function (
 ) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "sendEmailDisputeLos::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -498,12 +486,9 @@ exports.sendEmailToAskerLoserDispute = async function (
         },
       });
     }
-    console.log("SendGrid emailMessages:", emailMessages);
 
     const res = await sgMail.send(emailMessages);
-    console.log("SendGrid response:", res);
   } catch (ex) {
-    console.error("Error sending email:", ex);
     result.ex = ex;
   } finally {
     return result;

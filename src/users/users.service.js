@@ -415,7 +415,6 @@ exports.findByWalletAddressForUpdate = async (
 };
 exports.findUserByEmail = async (email, result = {}) => {
   try {
-    console.log(email, "email");
     result.data = await User.findOne({ email, role: "user" });
   } catch (ex) {
     result.ex = ex;

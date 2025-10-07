@@ -16,7 +16,6 @@ const otpGenerator = require("otp-generator");
 exports.signin = async (signInDto, result = {}) => {
   try {
     const { email, username, password, rememberMe } = signInDto;
-    console.log(signInDto, "signInDto");
 
     const response = await usersService.findUserByEmailOrUsername({
       email,
@@ -157,7 +156,6 @@ exports.signup = async (signUpDto, result = {}) => {
       result.hasConflict = true;
     } else {
       result.ex = ex;
-      console.log(ex, "exxxx");
     }
   } finally {
     return result;
@@ -676,7 +674,6 @@ exports.signupWithGoogle = async (code, result = {}) => {
   try {
     const { payload } = await googleAuthenticate(code);
     const { email, name, picture } = payload;
-    console.log(payload, "payload670");
 
     let userResult = await usersService.findUserByEmail(email);
 
@@ -685,7 +682,6 @@ exports.signupWithGoogle = async (code, result = {}) => {
     if (user && user.data === null) {
       user = null;
     }
-    console.log(user, "user");
 
     // create if not exists
     if (!user) {

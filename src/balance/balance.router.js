@@ -8,12 +8,16 @@ const validation = require("./balance.validation");
 router.post(
   "/",
   //   [JWT.verifyAccessToken],
-  [
-    // JWT.verifyAccessToken,
-    validate(validation.create, { keyByField: true }),
-  ],
+  [JWT.verifyAccessToken, validate(validation.create, { keyByField: true })],
   balanceController.create
 );
 // router.get("/", [JWT.verifyAccessToken], balanceController.byUserId);
+router.get(
+  "/allAsset",
+  [JWT.verifyAccessToken],
+  [validate(validation.allAsset, { keyByField: true })],
+
+  balanceController.allAsset
+);
 
 module.exports = router;

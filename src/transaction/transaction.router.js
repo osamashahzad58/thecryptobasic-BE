@@ -14,6 +14,31 @@ router.post(
   ],
   transactionController.create
 );
-router.get("/", [JWT.verifyAccessToken], transactionController.byUserId);
+router.get(
+  "/",
+  [JWT.verifyAccessToken],
+  [validate(validation.allAsset, { keyByField: true })],
+  transactionController.byUserId
+);
+router.get(
+  "/allAsset",
+  [JWT.verifyAccessToken],
+  [validate(validation.allAsset, { keyByField: true })],
+
+  transactionController.allAsset
+);
+
+router.get(
+  "/stats",
+  [JWT.verifyAccessToken],
+  [validate(validation.stats, { keyByField: true })],
+  transactionController.stats
+);
+router.get(
+  "/chart",
+  [JWT.verifyAccessToken],
+  [validate(validation.stats, { keyByField: true })],
+  transactionController.chart
+);
 
 module.exports = router;

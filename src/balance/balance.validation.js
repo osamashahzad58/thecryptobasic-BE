@@ -10,6 +10,8 @@ const SOLANA_CHAIN = "sol";
 module.exports = {
   create: {
     body: Joi.object({
+      name: Joi.string().required(),
+      isMe: Joi.boolean().required(),
       walletAddress: Joi.string()
         .required()
         .custom((value, helpers) => {
@@ -40,6 +42,12 @@ module.exports = {
           ].join(", ")}]`,
           "any.required": "chain is required",
         }),
+    }),
+  },
+  allAsset: {
+    query: Joi.object({
+      offset: Joi.number().integer().required(),
+      limit: Joi.number().integer().required(),
     }),
   },
 };

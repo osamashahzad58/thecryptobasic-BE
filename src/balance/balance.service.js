@@ -1,5 +1,6 @@
 require("dotenv").config();
-
+const mongoose = require("mongoose");
+const { ObjectId } = require("mongodb");
 const API_KEY_MORALIS =
   process.env.API_KEY_MORALIS ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImEzOWVhMDU5LWQwNTEtNGNiOS05MTg2LTIxZjBhNDMwNzY1YyIsIm9yZ0lkIjoiNDcwMjM4IiwidXNlcklkIjoiNDgzNzQ2IiwidHlwZUlkIjoiM2RkMzNiNTctZjVlMS00NzE2LWE1NWMtNzAxYzM5NThlODliIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTc1NzE1ODEsImV4cCI6NDkxMzMzMTU4MX0.4pvqmwvn7F4p-mPJt4jQahho771hL0wwQyrDH_ccotk";
@@ -13,47 +14,53 @@ let Balance = require("./balance.model");
 // MAIN function
 exports.create = async (createDto, result = {}) => {
   try {
-    const { walletAddress, chain } = createDto;
-    console.log("[CREATE] Incoming payload:", createDto);
+    const { walletAddress, chain, userId } = createDto;
+
+    if (!walletAddress) {
+      result.ex = "walletAddress is required";
+      return result;
+    }
 
     let tokens = [];
 
+    // 1. Fetch tokens depending on chain type
     if (chain === "sol") {
-      console.log("[CREATE] Fetching Solana tokens from Helius...");
       tokens = await getWalletTokensHelius(walletAddress);
     } else {
-      console.log(
-        `[CREATE] Fetching EVM tokens from Moralis for chain: ${chain}...`
-      );
       tokens = await getWalletTokensMoralis(walletAddress, chain);
     }
 
-    console.log("[CREATE] Tokens fetched:", tokens.length);
-
+    // 2. Handle case with no tokens
     if (!tokens || tokens.length === 0) {
-      console.log("[CREATE] No tokens found for this wallet");
       result.data = [];
       result.message = "No tokens found for this wallet";
       return result;
     }
 
-    // Upsert wallet document with tokens array
+    // 3. Prepare update object
+    const updateData = {
+      walletAddress: walletAddress.toLowerCase(),
+      tokens,
+    };
+
+    // Add userId if provided
+    if (userId) {
+      updateData.userId = userId;
+    }
+
+    // 4. Upsert wallet document (create or update)
     const walletDoc = await Balance.findOneAndUpdate(
       { walletAddress: walletAddress.toLowerCase() },
-      { $set: { walletAddress: walletAddress.toLowerCase(), tokens } },
+      { $set: updateData },
       { upsert: true, new: true }
     );
 
-    console.log("[CREATE] Wallet saved/updated in DB:", walletDoc);
-
     result.data = walletDoc;
     result.message = "Wallet tokens fetched & saved successfully";
-    console.log("[CREATE] Final result:", result.message);
   } catch (ex) {
-    console.error("[CREATE] Error in Balance.create:", ex.message);
-    result.ex = ex.message;
+    console.error("[Balance.create] Error:", ex);
+    result.ex = ex.message || ex;
   } finally {
-    console.log("[CREATE] Returning result:", result);
     return result;
   }
 };
@@ -148,3 +155,78 @@ async function getWalletTokensHelius(walletAddress) {
   console.log("[HELIUS] Total tokens processed:", tokens.length);
   return tokens;
 }
+exports.allAsset = async (byUserIdDto, result = {}) => {
+  try {
+    const { userId, offset, limit } = byUserIdDto;
+    console.log(byUserIdDto, "byUserIdDto");
+
+    // 1. Fetch balance document for user
+    const wallet = await Balance.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+    });
+    console.log(wallet, "wallet");
+    // 2. Handle case: no wallet or no tokens
+    if (!wallet || !wallet.tokens || wallet.tokens.length === 0) {
+      result.data = {
+        total: 0,
+        limit: Number(limit) || 10,
+        offset: Number(offset) || 0,
+        totalCurrentValue: 0,
+        totalInvestedValue: 0,
+        totalProfitLoss: 0,
+        totalProfitLossPct: 0,
+        items: [],
+      };
+      return result;
+    }
+
+    // 3. Apply pagination
+    const start = (Number(offset) - 1) * (Number(limit) || 10);
+    const end = start + (Number(limit) || 10);
+    const paginatedTokens = wallet.tokens.slice(start, end);
+
+    // 4. Compute stats for each token
+    const items = paginatedTokens.map((token) => {
+      const price = Number(token.priceUSD || 0);
+      const balance = Number(token.balance || 0);
+      const value = Number(token.totalValueUSD || balance * price);
+
+      return {
+        tokenAddress: token.tokenAddress,
+        name: token.name || "",
+        symbol: token.symbol || "",
+        balance: Number(balance.toFixed(8)),
+        priceUSD: Number(price.toFixed(6)),
+        totalValueUSD: Number(value.toFixed(2)),
+      };
+    });
+
+    // 5. Portfolio totals
+    const totalCurrentValue = items.reduce(
+      (sum, t) => sum + t.totalValueUSD,
+      0
+    );
+
+    // Note: since you’re pulling from live balances, there’s no "invested value"
+    // so we set it same as current or 0, depending on design
+    const totalInvestedValue = 0;
+    const totalProfitLoss = 0;
+    const totalProfitLossPct = 0;
+
+    result.data = {
+      total: wallet.tokens.length,
+      limit: Number(limit) || 10,
+      offset: Number(offset) || 0,
+      totalCurrentValue: Number(totalCurrentValue.toFixed(2)),
+      totalInvestedValue,
+      totalProfitLoss,
+      totalProfitLossPct,
+      items,
+    };
+  } catch (ex) {
+    console.error("[allAsset] Error (balance-based):", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};

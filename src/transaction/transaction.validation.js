@@ -63,4 +63,15 @@ module.exports = {
       return value;
     }),
   },
+  allAsset: {
+    query: Joi.object({
+      offset: Joi.number().integer().required(),
+      limit: Joi.number().integer().required(),
+    }),
+  },
+  stats: {
+    query: Joi.object({
+      timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
+    }),
+  },
 };
