@@ -380,8 +380,8 @@ exports.chartbyId = async ({ id }) => {
 
     // chart ko filter karo -> sirf price, volume, timestamp rakho
     const chart = dbData.chart.map((c) => ({
-      price: c.price,
       market_cap: c.market_cap,
+      volume: c.volume,
       timestamp: c.timestamp,
       // name: dbData.name,
     }));
