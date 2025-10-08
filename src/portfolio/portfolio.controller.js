@@ -72,3 +72,49 @@ exports.update = async function (req, res, next) {
     next(ex);
   }
 };
+exports.getByPortfolioId = async function (req, res, next) {
+  try {
+    const getDto = {
+      ...req.body,
+      userId: req.user?.id,
+      portfolioId: req.params.id,
+    };
+    console.log(getDto, "getDto");
+
+    const result = await portfolioService.getByPortfolioId(getDto);
+
+    if (result.ex) throw result.ex;
+
+    if (!result.data) {
+      throw createError(StatusCodes.NOT_FOUND, "Portfolio not found");
+    }
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Portfolio updated successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.stats = async (req, res, next) => {
+  try {
+    const statsDto = {
+      _id: req.query?.portfolioId,
+      timeFilter: req.query?.timeFilter,
+    };
+    console.log(statsDto, "statsDto contr");
+    const result = await portfolioService.stats(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User stats fetched successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

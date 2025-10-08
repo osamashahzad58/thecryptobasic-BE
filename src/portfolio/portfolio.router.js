@@ -20,5 +20,11 @@ router.put(
   // [validate(validation.update, { keyByField: true })],
   portfolioController.update
 );
+router.get(
+  "/stats",
+  [validate(validation.stats, { keyByField: true })],
+  portfolioController.stats
+);
+router.get("/:id", portfolioController.getByPortfolioId);
 
 module.exports = router;
