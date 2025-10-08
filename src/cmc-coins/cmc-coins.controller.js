@@ -71,10 +71,10 @@ exports.getPriceChart = async (req, res, next) => {
     next(ex);
   }
 };
-exports.getCompare = async (req, res, next) => {
+exports.getConverter = async (req, res, next) => {
   try {
-    const getCompareDto = { ...req.query };
-    const result = await cmcCoinsService.getCompare(getCompareDto);
+    const getConverterDto = { ...req.query };
+    const result = await cmcCoinsService.getConverter(getConverterDto);
 
     if (result.ex) throw result.ex;
     if (result.data.error)

@@ -39,12 +39,12 @@ router.get(
   cmcCoinsController.getPriceChart
 );
 router.get(
-  "/compare",
+  "/converter",
   [
     // JWT.verifyAccessToken,
     validate(cmcCoinsValidation.getCompare, { keyByField: true }),
   ],
-  cmcCoinsController.getCompare
+  cmcCoinsController.getConverter
 );
 router.get(
   "/getPricePerformanceStats",

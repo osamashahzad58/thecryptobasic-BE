@@ -47,3 +47,28 @@ exports.getList = async function (req, res, next) {
     next(ex);
   }
 };
+exports.update = async function (req, res, next) {
+  try {
+    const updateDto = {
+      ...req.body,
+      userId: req.user?.id,
+      portfolioId: req.params.id,
+    };
+
+    const result = await portfolioService.update(updateDto);
+
+    if (result.ex) throw result.ex;
+
+    if (!result.data) {
+      throw createError(StatusCodes.NOT_FOUND, "Portfolio not found");
+    }
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Portfolio updated successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

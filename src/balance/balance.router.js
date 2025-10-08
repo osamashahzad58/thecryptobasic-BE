@@ -7,11 +7,18 @@ const validation = require("./balance.validation");
 
 router.post(
   "/",
-  //   [JWT.verifyAccessToken],
-  [JWT.verifyAccessToken, validate(validation.create, { keyByField: true })],
+  [JWT.verifyAccessToken],
+  [validate(validation.create, { keyByField: true })],
   balanceController.create
 );
 // router.get("/", [JWT.verifyAccessToken], balanceController.byUserId);
+router.get("/", [JWT.verifyAccessToken], balanceController.getList);
+router.get(
+  "/combinePortfolio",
+  [JWT.verifyAccessToken],
+  balanceController.getCombinePortfolio
+);
+
 router.get(
   "/allAsset",
   [JWT.verifyAccessToken],

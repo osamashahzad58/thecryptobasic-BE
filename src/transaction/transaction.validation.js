@@ -74,4 +74,15 @@ module.exports = {
       timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
     }),
   },
+  update: {
+    body: Joi.object({
+      type: Joi.string().valid("buy", "sell", "transfer").optional(),
+      transferDirection: Joi.string().valid("in", "out").optional(),
+      transactionTime: Joi.date().optional(),
+      note: Joi.string().allow("").optional(),
+      quantity: Joi.number().positive().optional(),
+      fee: Joi.number().min(0).optional(),
+      pricePerCoin: Joi.number().min(0).optional(),
+    }),
+  },
 };

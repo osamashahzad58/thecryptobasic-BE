@@ -8,6 +8,11 @@ const portfolioSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    url: {
+      type: String,
+      default:
+        "https://img.freepik.com/free-photo/silver-bitcoin-cryptocurrency-icon-isolated_53876-14842.jpg?semt=ais_hybrid&w=740&q=80",
+    },
     name: {
       type: String,
       trim: true,

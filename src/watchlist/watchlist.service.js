@@ -29,9 +29,7 @@ exports.byUserId = async ({ userId }, result = {}) => {
 
     // Step 2: Get all coin details (only required fields)
     // Example output: [{ coinId: "1", name: "Bitcoin", symbol: "BTC", logo: "..." }, ...]
-    const coinsData = await coins
-      .find({}, { coinId: 1, name: 1, symbol: 1, logo: 1 })
-      .lean();
+    const coinsData = await coins.find({}).lean();
 
     // Step 3: Create a lookup object for fast access by coinId
     // Result: { "1": { coinId: "1", name: "Bitcoin", symbol: "BTC", logo: "..." }, ... }

@@ -58,6 +58,11 @@ const balanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    url: {
+      type: String,
+      default:
+        "https://img.freepik.com/free-photo/silver-bitcoin-cryptocurrency-icon-isolated_53876-14842.jpg?semt=ais_hybrid&w=740&q=80",
+    },
     tokens: [tokenSchema], // array of tokens for this wallet
   },
   { timestamps: true }

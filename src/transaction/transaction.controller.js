@@ -114,3 +114,26 @@ exports.chart = async (req, res, next) => {
     next(ex);
   }
 };
+exports.update = async function (req, res, next) {
+  try {
+    const updateDto = {
+      id: req.params.id,
+      userId: req.user?.id,
+      ...req.body,
+    };
+
+    const result = await transactionService.update(updateDto);
+
+    if (result.ex) throw result.ex;
+    if (!result.data)
+      throw createError(StatusCodes.NOT_FOUND, "Transaction not found");
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction updated successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

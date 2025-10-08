@@ -40,5 +40,11 @@ router.get(
   [validate(validation.stats, { keyByField: true })],
   transactionController.chart
 );
+// router.put(
+//   "/:id",
+//   [JWT.verifyAccessToken],
+//   [validate(validation.update, { keyByField: true })],
+//   transactionController.update
+// );
 
 module.exports = router;

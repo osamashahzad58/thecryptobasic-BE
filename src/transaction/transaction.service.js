@@ -488,3 +488,35 @@ exports.chart = async (chartDto, result = {}) => {
     return result;
   }
 };
+exports.update = async (updateDto, result = {}) => {
+  try {
+    const { id, userId, ...updateFields } = updateDto;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      result.ex = new Error("Invalid transaction ID");
+      return result;
+    }
+
+    // Optional: ensure only the user's transaction can be updated
+    const filter = { _id: id, userId };
+
+    // Fetch transaction first to reapply calculations
+    const existingTx = await Transaction.findOne(filter);
+    if (!existingTx) {
+      result.data = null;
+      return result;
+    }
+
+    Object.assign(existingTx, updateFields);
+
+    // Trigger `pre('validate')` again to recalc totals
+    await existingTx.validate();
+    const updated = await existingTx.save();
+
+    result.data = updated;
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};

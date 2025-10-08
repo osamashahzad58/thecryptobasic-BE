@@ -152,9 +152,9 @@ exports.getPriceChart = async (getPriceChartsDto, result = {}) => {
     return result;
   }
 };
-exports.getCompare = async (getCompareDto, result = {}) => {
+exports.getConverter = async (getConverterDto, result = {}) => {
   try {
-    const { tokenA, tokenB } = getCompareDto;
+    const { tokenA, tokenB } = getConverterDto;
 
     const [coinA, coinB] = await Promise.all([
       CmcCoinsModel.findOne({ name: { $regex: `^${tokenA}$`, $options: "i" } }),

@@ -135,3 +135,36 @@ exports.getList = async (getListDto, result = {}) => {
     return result;
   }
 };
+exports.update = async (updateDto, result = {}) => {
+  try {
+    const { portfolioId, userId, ...updateFields } = updateDto;
+
+    if (!portfolioId) {
+      result.ex = new Error("portfolioId is required");
+      return result;
+    }
+
+    // Make sure the user can only update their own portfolio
+    const filter = { _id: portfolioId };
+    if (userId) filter.userId = userId;
+
+    const updated = await Portfolio.findOneAndUpdate(
+      filter,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    result.data = updated;
+  } catch (ex) {
+    if (ex.code === 11000) {
+      result.ex = {
+        message: "Duplicate key error. Portfolio already exists.",
+        code: 11000,
+      };
+    } else {
+      result.ex = ex;
+    }
+  } finally {
+    return result;
+  }
+};

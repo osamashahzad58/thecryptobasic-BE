@@ -14,5 +14,11 @@ router.post(
   portfolioController.create
 );
 router.get("/", [JWT.verifyAccessToken], portfolioController.getList);
+router.put(
+  "/:id",
+  [JWT.verifyAccessToken],
+  // [validate(validation.update, { keyByField: true })],
+  portfolioController.update
+);
 
 module.exports = router;
