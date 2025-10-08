@@ -555,7 +555,7 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection, userId } =
       getAllCryptoDto;
-
+    console.log(userId, "userId");
     const filter = {};
     const sortOptions = {
       ...(orderField && { [orderField]: +orderDirection || 1 }),

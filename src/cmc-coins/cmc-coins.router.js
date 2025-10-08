@@ -3,7 +3,7 @@ const router = require("express").Router();
 const { validate } = require("express-validation");
 const cmcCoinsController = require("./cmc-coins.controller");
 const cmcCoinsValidation = require("./cmc-coins.validation");
-//const JWT = require("../common/auth/jwt")
+const JWT = require("../common/auth/jwt");
 
 router.get(
   "/listings",

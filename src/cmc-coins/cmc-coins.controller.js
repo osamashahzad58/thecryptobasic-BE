@@ -214,7 +214,6 @@ exports.getAllCrypto = async (req, res, next) => {
   try {
     const getAllCryptoDto = {
       ...req.query,
-      userId: req.user?.id,
     };
 
     const result = await cmcCoinsService.getAllCrypto(getAllCryptoDto);
@@ -232,7 +231,7 @@ exports.getAllCrypto = async (req, res, next) => {
 };
 exports.getSkipCoinId = async (req, res, next) => {
   try {
-    const getSkipCoinIdDto = { ...req.query, userId: req.user?.id };
+    const getSkipCoinIdDto = { ...req.query };
     const result = await cmcCoinsService.getSkipCoinId(getSkipCoinIdDto);
 
     if (result.ex) throw result.ex;

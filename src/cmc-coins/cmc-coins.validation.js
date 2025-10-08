@@ -53,7 +53,7 @@ module.exports = {
   AllCrypto: {
     query: Joi.object({
       limit: Joi.number().positive().required(),
-      id: Joi.string().trim().optional(),
+      userId: Joi.string().trim().optional(),
       search: Joi.string().optional(),
       offset: Joi.number().positive().required(),
       orderField: Joi.string().valid("price"),
@@ -66,6 +66,7 @@ module.exports = {
   skipCoinId: {
     query: Joi.object({
       limit: Joi.number().positive().required(),
+      userId: Joi.string().trim().optional(),
       skipCoinId: Joi.string().required(), // coinId to skip
       search: Joi.string().optional(),
       offset: Joi.number().positive().required(),

@@ -61,38 +61,67 @@ exports.byUserId = async ({ userId }, result = {}) => {
 
 exports.toggle = async (userId, coinId, result = {}) => {
   try {
-    const userObjectId = mongoose.Types.ObjectId(userId);
+    if (!userId || !coinId) {
+      result.ex = new Error("Missing userId or coinId");
+      return result;
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
     const coinIdStr = String(coinId);
 
-    const existing = await Watchlist.findOne({
+    // Check if watchlist record exists
+    let existing = await Watchlist.findOne({
       userId: userObjectId,
       coinId: coinIdStr,
     });
 
     if (existing) {
-      await Watchlist.deleteOne({ _id: existing._id });
+      // Toggle between true/false
+      const newStatus = !existing.isWatchlist;
+
+      // Update the watchlist status
+      existing.isWatchlist = newStatus;
+      await existing.save();
+
+      // Update coin watchlist count
       await coins.updateOne(
         { coinId: coinIdStr },
-        { $inc: { watchlistCount: -1 } }
+        { $inc: { watchlistCount: newStatus ? 1 : -1 } }
       );
 
-      result.data = { removed: true, coinId: coinIdStr };
-      result.message = "Coin removed from watchlist";
+      result.data = {
+        toggled: true,
+        coinId: coinIdStr,
+        isWatchlist: newStatus,
+        watchlist: existing,
+      };
+      result.message = newStatus
+        ? "Coin added to watchlist"
+        : "Coin removed from watchlist";
     } else {
+      // Create a new watchlist entry with true status
       const data = await Watchlist.create({
         userId: userObjectId,
         coinId: coinIdStr,
         isWatchlist: true,
       });
+
+      // Increment the watchlist count for the coin
       await coins.updateOne(
         { coinId: coinIdStr },
         { $inc: { watchlistCount: 1 } }
       );
 
-      result.data = { added: true, coinId: coinIdStr, watchlist: data };
+      result.data = {
+        added: true,
+        coinId: coinIdStr,
+        isWatchlist: true,
+        watchlist: data,
+      };
       result.message = "Coin added to watchlist";
     }
   } catch (ex) {
+    console.error("[Watchlist.toggle] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
