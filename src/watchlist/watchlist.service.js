@@ -21,41 +21,101 @@ exports.create = async (createDto, result = {}) => {
     return result;
   }
 };
+// exports.byUserId = async ({ userId }, result = {}) => {
+//   try {
+//     // 1. Get all watchlist entries for this user
+//     const watchlist = await Watchlist.find({ userId }).lean();
+
+//     if (!watchlist.length) {
+//       result.data = [];
+//       result.message = "No coins in watchlist";
+//       return result;
+//     }
+
+//     // 2. Extract all coinIds from the watchlist
+//     const coinIds = watchlist.map((w) => w.coinId);
+
+//     // 3. Get only coins in the user's watchlist (exclude heavy fields)
+//     const coinsData = await coins
+//       .find(
+//         { coinId: { $in: coinIds } },
+//         { markets: 0, chart: 0, __v: 0, categories: 0, explorers: 0 } // exclude fields here
+//       )
+//       .lean();
+
+//     // 4. Merge coin details with watchlist info
+//     const coinLookup = {};
+//     coinsData.forEach((c) => {
+//       coinLookup[c.coinId] = c;
+//     });
+
+//     result.data = watchlist.map((w) => ({
+//       ...w,
+//       ...(coinLookup[w.coinId] || {}),
+//     }));
+
+//     result.message = "Watchlist fetched successfully";
+//   } catch (ex) {
+//     result.ex = ex;
+//   } finally {
+//     return result;
+//   }
+// };
 exports.byUserId = async ({ userId }, result = {}) => {
   try {
-    // 1. Get all watchlist entries for this user
-    const watchlist = await Watchlist.find({ userId }).lean();
-
-    if (!watchlist.length) {
-      result.data = [];
-      result.message = "No coins in watchlist";
+    if (!userId) {
+      result.ex = new Error("userId is required");
       return result;
     }
 
-    // 2. Extract all coinIds from the watchlist
+    // 1. Get all active watchlist entries (isWatchlist: true)
+    const watchlist = await Watchlist.find({
+      userId,
+      isWatchlist: true,
+    }).lean();
+    if (!watchlist.length) {
+      result.data = [];
+      result.message = "No active coins in watchlist";
+      return result;
+    }
+
+    // 2. Extract all coinIds from the active watchlist
     const coinIds = watchlist.map((w) => w.coinId);
 
-    // 3. Get only coins in the user's watchlist (exclude heavy fields)
+    // 3. Fetch coin details for those IDs (exclude heavy fields)
     const coinsData = await coins
       .find(
         { coinId: { $in: coinIds } },
-        { markets: 0, chart: 0, __v: 0, categories: 0, explorers: 0 } // exclude fields here
+        {
+          coinId: 1,
+          logo: 1,
+          price: 1,
+          name: 1,
+          symbol: 1,
+          market_cap: 1,
+          percent_change_7d: 1,
+          percent_change_24h: 1,
+          percent_change_1h: 1,
+          volume_change_24h: 1,
+        }
       )
       .lean();
 
-    // 4. Merge coin details with watchlist info
+    // 4. Create a lookup map for fast merging
     const coinLookup = {};
-    coinsData.forEach((c) => {
-      coinLookup[c.coinId] = c;
+    coinsData.forEach((coin) => {
+      coinLookup[coin.coinId] = coin;
     });
 
+    // 5. Merge each watchlist entry with its coin details
     result.data = watchlist.map((w) => ({
       ...w,
       ...(coinLookup[w.coinId] || {}),
     }));
 
-    result.message = "Watchlist fetched successfully";
+    result.message = "Active watchlist fetched successfully";
   } catch (ex) {
+    console.error("[Watchlist.byUserId] Error:", ex);
     result.ex = ex;
   } finally {
     return result;

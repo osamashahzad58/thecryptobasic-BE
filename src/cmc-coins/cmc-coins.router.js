@@ -42,10 +42,24 @@ router.get(
   "/converter",
   [
     // JWT.verifyAccessToken,
-    validate(cmcCoinsValidation.getCompare, { keyByField: true }),
+    validate(cmcCoinsValidation.getConverter, { keyByField: true }),
   ],
   cmcCoinsController.getConverter
 );
+router.get(
+  "/popularConversions",
+  // [
+  //   // JWT.verifyAccessToken,
+  //   validate(cmcCoinsValidation.getCompare, { keyByField: true }),
+  // ],
+  cmcCoinsController.getPopularConversions
+);
+router.get(
+  "/compare",
+  [validate(cmcCoinsValidation.getCompare, { keyByField: true })],
+  cmcCoinsController.getCompare
+);
+
 router.get(
   "/getPricePerformanceStats",
   [

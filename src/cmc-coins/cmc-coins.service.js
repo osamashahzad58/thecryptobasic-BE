@@ -152,13 +152,33 @@ exports.getPriceChart = async (getPriceChartsDto, result = {}) => {
     return result;
   }
 };
-exports.getConverter = async (getConverterDto, result = {}) => {
+exports.getConverter = async (getConverterDto = {}, result = {}) => {
   try {
     const { tokenA, tokenB } = getConverterDto;
+    console.log(getConverterDto, "getConverterDto");
 
+    if (!tokenA || !tokenB) {
+      result.error = true;
+      result.message = "Both tokenA and tokenB are required.";
+      return result;
+    }
+
+    // Try to match by coinId, symbol, or name (case-insensitive)
     const [coinA, coinB] = await Promise.all([
-      CmcCoinsModel.findOne({ name: { $regex: `^${tokenA}$`, $options: "i" } }),
-      CmcCoinsModel.findOne({ name: { $regex: `^${tokenB}$`, $options: "i" } }),
+      CmcCoinsModel.findOne({
+        $or: [
+          { coinId: tokenA },
+          { symbol: { $regex: `^${tokenA}$`, $options: "i" } },
+          { name: { $regex: `^${tokenA}$`, $options: "i" } },
+        ],
+      }),
+      CmcCoinsModel.findOne({
+        $or: [
+          { coinId: tokenB },
+          { symbol: { $regex: `^${tokenB}$`, $options: "i" } },
+          { name: { $regex: `^${tokenB}$`, $options: "i" } },
+        ],
+      }),
     ]);
 
     if (!coinA || !coinB) {
@@ -166,36 +186,63 @@ exports.getConverter = async (getConverterDto, result = {}) => {
       result.message = "One or both coins not found.";
       return result;
     }
-    const priceA = parseFloat(coinA.price);
-    const marketCapA = parseFloat(coinA.market_cap);
-    const marketCapB = parseFloat(coinB.market_cap);
+
+    // Parse values safely
+    const priceA = parseFloat(coinA.price) || 0;
+    const priceB = parseFloat(coinB.price) || 0;
+    const marketCapA = parseFloat(coinA.market_cap) || 0;
+    const marketCapB = parseFloat(coinB.market_cap) || 0;
+
+    if (!priceA || !marketCapA || !marketCapB) {
+      result.error = true;
+      result.message = "Invalid or missing market data for one or both coins.";
+      return result;
+    }
+
+    // Calculate conversion
     const calculatedPrice = (marketCapB / marketCapA) * priceA;
     const multiplier = marketCapB / marketCapA;
+
+    // Format currency
     const formatCurrency = (num) =>
       `$${num.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
 
-    const formattedComparison = `${formatCurrency(
-      calculatedPrice
-    )} (${multiplier.toFixed(2)}x)`;
     result.data = {
       tokenA: {
         name: coinA.name,
         symbol: coinA.symbol,
+        logo: coinA.logo,
+        volume_change_24h: coinA.volume_change_24h,
+        volume_24h: coinA.volume_24h,
+        percent_change_24h: coinA.percent_change_24h,
         price: priceA,
         marketCap: marketCapA,
       },
       tokenB: {
         name: coinB.name,
         symbol: coinB.symbol,
-        price: parseFloat(coinB.price),
+        logo: coinB.logo,
+        volume_change_24h: coinB.volume_change_24h,
+        volume_24h: coinB.volume_24h,
+        percent_change_24h: coinB.percent_change_24h,
+        price: priceB,
         marketCap: marketCapB,
       },
-      comparison: formattedComparison,
+      comparison: {
+        calculatedPrice,
+        formatted: `${formatCurrency(calculatedPrice)} (${multiplier.toFixed(
+          2
+        )}x)`,
+        multiplier: Number(multiplier.toFixed(4)),
+      },
     };
+
+    result.message = "Conversion calculated successfully.";
   } catch (ex) {
+    console.error("[getConverter] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
@@ -946,6 +993,145 @@ exports.getTopstats = async ({ id }, result = {}) => {
     result.error = true;
     result.ex = ex.message;
     result.success = false;
+  } finally {
+    return result;
+  }
+};
+exports.getPopularConversions = async (getDto = {}, result = {}) => {
+  try {
+    // Define 10 popular conversion pairs
+    const popularPairs = [
+      { tokenA: "BTC", tokenB: "ETH" },
+      { tokenA: "BTC", tokenB: "BNB" },
+      { tokenA: "BTC", tokenB: "SOL" },
+      { tokenA: "BTC", tokenB: "XRP" },
+      { tokenA: "ETH", tokenB: "SOL" },
+      { tokenA: "ETH", tokenB: "BNB" },
+      { tokenA: "ETH", tokenB: "ADA" },
+      { tokenA: "BNB", tokenB: "SOL" },
+      { tokenA: "SOL", tokenB: "XRP" },
+      { tokenA: "BTC", tokenB: "ADA" },
+    ];
+
+    // Fetch all involved coins in one go for efficiency
+    const allSymbols = [
+      ...new Set(popularPairs.flatMap((p) => [p.tokenA, p.tokenB])),
+    ];
+
+    const coins = await CmcCoinsModel.find({
+      symbol: { $in: allSymbols },
+    }).lean();
+
+    // Create quick lookup
+    const coinMap = {};
+    for (const coin of coins) {
+      coinMap[coin.symbol.toUpperCase()] = coin;
+    }
+
+    // Format helper
+    const formatCurrency = (num) =>
+      `$${num.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+
+    // Compute conversions
+    const conversions = [];
+
+    for (const { tokenA, tokenB } of popularPairs) {
+      const coinA = coinMap[tokenA.toUpperCase()];
+      const coinB = coinMap[tokenB.toUpperCase()];
+
+      if (!coinA || !coinB) continue;
+
+      const priceA = parseFloat(coinA.price) || 0;
+      const marketCapA = parseFloat(coinA.market_cap) || 0;
+      const marketCapB = parseFloat(coinB.market_cap) || 0;
+
+      if (!priceA || !marketCapA || !marketCapB) continue;
+
+      const calculatedPrice = (marketCapB / marketCapA) * priceA;
+      const multiplier = marketCapB / marketCapA;
+
+      conversions.push({
+        pair: `${tokenA}/${tokenB}`,
+        from: {
+          name: coinA.name,
+          symbol: coinA.symbol,
+          price: priceA,
+          marketCap: marketCapA,
+          logo: coinA.logo,
+        },
+        to: {
+          name: coinB.name,
+          symbol: coinB.symbol,
+          price: parseFloat(coinB.price),
+          marketCap: marketCapB,
+          logo: coinB.logo,
+        },
+        conversion: {
+          calculatedPrice,
+          formatted: `${formatCurrency(calculatedPrice)} (${multiplier.toFixed(
+            2
+          )}x)`,
+          multiplier: Number(multiplier.toFixed(4)),
+        },
+      });
+    }
+
+    result.data = conversions;
+    result.message = "Top 10 popular conversions fetched successfully.";
+  } catch (ex) {
+    console.error("[getPopularConversions] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getCompare = async (getCompareDto, result = {}) => {
+  try {
+    const { coinIds = [] } = getCompareDto;
+
+    if (!coinIds.length) {
+      result.error = true;
+      result.message = "No coinIds provided for comparison.";
+      return result;
+    }
+
+    // Find all coins by coinId
+    const coins = await CmcCoinsModel.find({
+      coinId: { $in: coinIds.map(String) },
+    });
+
+    if (!coins.length) {
+      result.error = true;
+      result.message = "No matching coins found.";
+      return result;
+    }
+
+    // Format data
+    const data = coins.map((coin) => ({
+      coinId: coin.coinId,
+      name: coin.name,
+      symbol: coin.symbol,
+      logo: coin.logo,
+      price: Number(coin.price || 0),
+      priceChange24h: Number(coin.percent_change_24h || 0),
+      marketCap: Number(coin.market_cap || 0),
+      marketCapChange24h: Number(coin.market_cap_change_24h || 0),
+      volume24h: Number(coin.volume_24h || 0),
+      circulatingSupply: Number(coin.circulating_supply || 0),
+      rank: Number(coin.cmcRank || 0),
+      activeSince: coin.createdAt,
+    }));
+
+    result.data = {
+      total: data.length,
+      coins: data,
+    };
+  } catch (ex) {
+    console.error("[getCompare] Error:", ex);
+    result.ex = ex;
   } finally {
     return result;
   }

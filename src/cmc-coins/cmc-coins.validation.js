@@ -21,12 +21,32 @@ module.exports = {
       limit: Joi.number().integer().required(),
     }),
   },
-  getCompare: {
+
+  getConverter: {
     query: Joi.object({
       tokenA: Joi.string().required(),
       tokenB: Joi.string().required(),
     }),
   },
+  getCompare: {
+    query: Joi.object({
+      coinIds: Joi.alternatives()
+        .try(
+          Joi.array().items(Joi.string().trim().min(1)).min(1),
+          Joi.string()
+            .trim()
+            .pattern(/^[^,]+(,[^,]+)*$/) // comma-separated list of coinIds
+        )
+        .required()
+        .messages({
+          "any.required": "coinIds field is required",
+          "string.pattern.base":
+            "coinIds must be comma-separated or an array of strings",
+          "array.min": "Provide at least one coinId",
+        }),
+    }),
+  },
+
   address: {
     query: Joi.object({
       address: Joi.string().trim().required(),

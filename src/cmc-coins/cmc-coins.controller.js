@@ -74,6 +74,7 @@ exports.getPriceChart = async (req, res, next) => {
 exports.getConverter = async (req, res, next) => {
   try {
     const getConverterDto = { ...req.query };
+    console.log(getConverterDto, "getConverterDto");
     const result = await cmcCoinsService.getConverter(getConverterDto);
 
     if (result.ex) throw result.ex;
@@ -82,6 +83,24 @@ exports.getConverter = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Currency Price Chart",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getPopularConversions = async (req, res, next) => {
+  try {
+    const getDto = { ...req.query };
+    console.log(getDto, "getDto");
+    const result = await cmcCoinsService.getPopularConversions(getDto);
+
+    if (result.ex) throw result.ex;
+    if (result.data.error)
+      throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Popular Conversions",
       data: result.data,
     });
   } catch (ex) {
@@ -373,6 +392,30 @@ exports.getTopstats = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Get stats successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getCompare = async (req, res, next) => {
+  try {
+    // Accept both ?coinIds[]=1&coinIds[]=1027 or ?coinIds=1,1027
+    const coinIds = Array.isArray(req.query.coinIds)
+      ? req.query.coinIds
+      : req.query.coinIds?.split(",") || [];
+
+    const getCompareDto = { coinIds };
+
+    const result = await cmcCoinsService.getCompare(getCompareDto);
+
+    if (result.ex) throw result.ex;
+    if (result.error)
+      throw createError(StatusCodes.BAD_REQUEST, result.message);
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Coins compared successfully",
       data: result.data,
     });
   } catch (ex) {

@@ -2,6 +2,7 @@ let Portfolio = require("./portfolio.model");
 let Transaction = require("../transaction/transaction.model");
 let Coin = require("../cmc-coins/models/cmc-coins.model");
 const mongoose = require("mongoose");
+const { symbol } = require("joi");
 
 exports.create = async (createDto, result = {}) => {
   try {
@@ -39,7 +40,6 @@ exports.getList = async (getListDto, result = {}) => {
   try {
     const { userId } = getListDto;
 
-    // 1. Get all portfolios for the user
     const portfolios = await Portfolio.find({
       userId: new mongoose.Types.ObjectId(userId),
     });
@@ -49,25 +49,21 @@ exports.getList = async (getListDto, result = {}) => {
       return result;
     }
 
-    // 2. Get all transactions for those portfolios
     const portfolioIds = portfolios.map((p) => p._id);
     const transactions = await Transaction.find({
       portfolioId: { $in: portfolioIds },
     });
 
-    // 3. Get all unique coinIds used
     const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
     const coins = await Coin.find({ coinId: { $in: coinIds } });
 
-    // Create lookup map for coin info
     const coinMap = {};
     for (const coin of coins) {
       coinMap[coin.coinId] = coin;
     }
 
-    // 4. Group transactions by portfolioId and compute holdings
     const transactionsByPortfolio = {};
-    const portfolioHoldings = {}; // { portfolioId: { coinId: quantity } }
+    const portfolioHoldings = {};
 
     for (const tx of transactions) {
       const pid = tx.portfolioId.toString();
@@ -77,14 +73,15 @@ exports.getList = async (getListDto, result = {}) => {
       const coinInfo = coinMap[tx.coinId] || {};
       const coinId = tx.coinId;
 
-      // Attach coin info to transaction
       transactionsByPortfolio[pid].push({
         ...tx.toObject(),
         coinInfo: {
           coinId: coinInfo.coinId || tx.coinId,
+          name: coinInfo.name || tx.name,
+          symbol: coinInfo.symbol || tx.name,
           logo: coinInfo.logo || null,
-          price: coinInfo.price || 0, // assuming your Coin model has a price field
-          market_cap: coinInfo.market_cap || 0, // assuming your Coin model has a price field
+          price: coinInfo.price || 0,
+          market_cap: coinInfo.market_cap || 0,
           percent_change_7d: coinInfo.percent_change_7d || 0, // assuming your Coin model has a price field
           percent_change_24h: coinInfo.percent_change_24h || 0, // assuming your Coin model has a price field
           percent_change_1h: coinInfo.percent_change_1h || 0, // assuming your Coin model has a price field
@@ -181,7 +178,7 @@ exports.getByPortfolioId = async (getDto, result = {}) => {
     // 1. Find the portfolio
     const portfolio = await Portfolio.findById(portfolioId);
     if (!portfolio) {
-      result.ex = new Error("Portfolio not found");
+      result.notFound = true;
       return result;
     }
     console.log(portfolio, "portfolio");
@@ -216,6 +213,8 @@ exports.getByPortfolioId = async (getDto, result = {}) => {
           coinId: coinInfo.coinId || tx.coinId,
           logo: coinInfo.logo || null,
           price: coinInfo.price || 0,
+          name: coinInfo.name || tx.name,
+          symbol: coinInfo.symbol || tx.name,
           market_cap: coinInfo.market_cap || 0,
           percent_change_7d: coinInfo.percent_change_7d || 0,
           percent_change_24h: coinInfo.percent_change_24h || 0,
@@ -424,3 +423,98 @@ function getEmptyStats() {
     portfolioHealth: { score: 0, label: "None" },
   };
 }
+exports.portfolioAsset = async (getDto, result = {}) => {
+  try {
+    const { _id } = getDto;
+    console.log(getDto, "portfolioId");
+
+    if (!_id) {
+      result.ex = new Error("portfolioId is required");
+      return result;
+    }
+
+    const portfolio = await Portfolio.findById(_id).lean();
+    if (!portfolio) {
+      result.notFound = true;
+      result.message = "Portfolio not found";
+      return result;
+    }
+
+    const transactions = await Transaction.find({
+      portfolioId: new mongoose.Types.ObjectId(_id),
+    }).lean();
+
+    if (!transactions.length) {
+      result.data = { ...portfolio, totalValue: 0, coins: [] };
+      result.message = "No transactions found for this portfolio";
+      return result;
+    }
+
+    const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
+
+    const coins = await Coin.find({ coinId: { $in: coinIds } }).lean();
+
+    const coinMap = {};
+    for (const coin of coins) {
+      coinMap[coin.coinId] = coin;
+    }
+
+    const holdings = {};
+    for (const tx of transactions) {
+      const coinId = tx.coinId;
+      const qty = tx.quantity || 0;
+      const currentQty = holdings[coinId] || 0;
+
+      if (tx.type === "buy") {
+        holdings[coinId] = currentQty + qty;
+      } else if (tx.type === "sell") {
+        holdings[coinId] = currentQty - qty;
+      } else if (tx.type === "transfer") {
+        if (tx.transferDirection === "in") {
+          holdings[coinId] = currentQty + qty;
+        } else if (tx.transferDirection === "out") {
+          holdings[coinId] = currentQty - qty;
+        }
+      }
+    }
+
+    const uniqueCoins = [];
+    let totalValue = 0;
+
+    for (const coinId of coinIds) {
+      const coin = coinMap[coinId];
+      if (!coin) continue;
+
+      const qty = holdings[coinId] || 0;
+      const coinValue = qty * (Number(coin.price) || 0);
+      totalValue += coinValue;
+
+      uniqueCoins.push({
+        coinId: coin.coinId,
+        logo: coin.logo || null,
+        price: Number(coin.price || 0),
+        name: coin.name || tx.name,
+        symbol: coin.symbol || tx.name,
+        market_cap: Number(coin.market_cap || 0),
+        percent_change_7d: Number(coin.percent_change_7d || 0),
+        percent_change_24h: Number(coin.percent_change_24h || 0),
+        percent_change_1h: Number(coin.percent_change_1h || 0),
+        volume_change_24h: Number(coin.volume_change_24h || 0),
+        holdingQuantity: qty,
+        holdingValue: coinValue,
+      });
+    }
+
+    result.data = {
+      ...portfolio,
+      totalValue,
+      coins: uniqueCoins,
+    };
+    result.message = "Portfolio coins fetched successfully";
+  } catch (ex) {
+    console.error("[portfolioAsset] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
