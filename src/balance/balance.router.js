@@ -20,7 +20,7 @@ router.get(
 );
 
 router.get(
-  "/allAsset",
+  "/fromBlockchain",
   [JWT.verifyAccessToken],
   [validate(validation.allAsset, { keyByField: true })],
 

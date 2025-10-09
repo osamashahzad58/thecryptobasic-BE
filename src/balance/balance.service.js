@@ -162,69 +162,16 @@ exports.allAsset = async (byUserIdDto, result = {}) => {
     const { userId, offset, limit } = byUserIdDto;
     console.log(byUserIdDto, "byUserIdDto");
 
-    // 1. Fetch balance document for user
-    const wallet = await Balance.findOne({
-      userId: new mongoose.Types.ObjectId(userId),
-    });
-    console.log(wallet, "wallet");
-    // 2. Handle case: no wallet or no tokens
-    if (!wallet || !wallet.tokens || wallet.tokens.length === 0) {
-      result.data = {
-        total: 0,
-        limit: Number(limit) || 10,
-        offset: Number(offset) || 0,
-        totalCurrentValue: 0,
-        totalInvestedValue: 0,
-        totalProfitLoss: 0,
-        totalProfitLossPct: 0,
-        items: [],
-      };
+    if (!userId) {
+      result.ex = new Error("Missing userId");
       return result;
     }
 
-    // 3. Apply pagination
-    const start = (Number(offset) - 1) * (Number(limit) || 10);
-    const end = start + (Number(limit) || 10);
-    const paginatedTokens = wallet.tokens.slice(start, end);
+    const wallet = await Balance.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+    }).lean();
 
-    // 4. Compute stats for each token
-    const items = paginatedTokens.map((token) => {
-      const price = Number(token.priceUSD || 0);
-      const balance = Number(token.balance || 0);
-      const value = Number(token.totalValueUSD || balance * price);
-
-      return {
-        tokenAddress: token.tokenAddress,
-        name: token.name || "",
-        symbol: token.symbol || "",
-        balance: Number(balance.toFixed(8)),
-        priceUSD: Number(price.toFixed(6)),
-        totalValueUSD: Number(value.toFixed(2)),
-      };
-    });
-
-    // 5. Portfolio totals
-    const totalCurrentValue = items.reduce(
-      (sum, t) => sum + t.totalValueUSD,
-      0
-    );
-
-    // Note: since you’re pulling from live balances, there’s no "invested value"
-    // so we set it same as current or 0, depending on design
-    const totalInvestedValue = 0;
-    const totalProfitLoss = 0;
-    const totalProfitLossPct = 0;
-
-    result.data = {
-      total: wallet.tokens.length,
-      limit: Number(limit) || 10,
-      offset: Number(offset) || 0,
-      totalCurrentValue: Number(totalCurrentValue.toFixed(2)),
-      totalInvestedValue,
-      totalProfitLoss,
-      totalProfitLossPct,
-      items,
-    };
+    result.data = wallet;
   } catch (ex) {
     console.error("[allAsset] Error (balance-based):", ex);
     result.ex = ex;
@@ -232,6 +179,7 @@ exports.allAsset = async (byUserIdDto, result = {}) => {
     return result;
   }
 };
+
 exports.getList = async (getListDto, result = {}) => {
   try {
     const { userId } = getListDto;

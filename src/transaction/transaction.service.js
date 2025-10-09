@@ -232,6 +232,119 @@ exports.allAsset = async (byUserIdDto, result = {}) => {
     return result;
   }
 };
+exports.allAsset = async (byUserIdDto, result = {}) => {
+  try {
+    const { userId, offset, limit } = byUserIdDto;
+
+    // 1. Get all user transactions
+    const transactions = await Transaction.find({
+      userId: new mongoose.Types.ObjectId(userId),
+    });
+
+    if (!transactions.length) {
+      result.data = {
+        total: 0,
+        limit: Number(limit) || 10,
+        offset: Number(offset) || 0,
+        totalCurrentValue: 0,
+        totalInvestedValue: 0,
+        totalProfitLoss: 0,
+        totalProfitLossPct: 0,
+        items: [],
+      };
+      return result;
+    }
+
+    // 2. Group transactions by coinId to compute holdings
+    const holdings = {};
+    for (const tx of transactions) {
+      const { coinId, type, transferDirection, quantity, pricePerCoin } = tx;
+
+      if (!holdings[coinId]) {
+        holdings[coinId] = {
+          quantity: 0,
+          totalCost: 0,
+          totalBuyQty: 0,
+        };
+      }
+
+      if (type === "buy") {
+        holdings[coinId].quantity += quantity;
+        holdings[coinId].totalCost += quantity * pricePerCoin;
+        holdings[coinId].totalBuyQty += quantity;
+      } else if (type === "sell") {
+        holdings[coinId].quantity -= quantity;
+      } else if (type === "transfer") {
+        if (transferDirection === "in") holdings[coinId].quantity += quantity;
+        else if (transferDirection === "out")
+          holdings[coinId].quantity -= quantity;
+      }
+    }
+
+    // 3. Fetch coin data
+    const coinIds = Object.keys(holdings);
+    const coins = await Coin.find({ coinId: { $in: coinIds } })
+      .skip(Number(offset) || 0)
+      .limit(Number(limit) || 10);
+
+    // 4. Compute stats for each coin
+    const items = coins.map((coin) => {
+      const h = holdings[coin.coinId] || {};
+      const qty = h.quantity || 0;
+      const avgBuyPrice = h.totalBuyQty > 0 ? h.totalCost / h.totalBuyQty : 0;
+
+      const currentPrice = Number(coin.price || 0);
+      const currentValue = qty * currentPrice;
+      const investedValue = qty * avgBuyPrice;
+      const profitLoss = currentValue - investedValue;
+      const profitLossPct =
+        investedValue > 0 ? (profitLoss / investedValue) * 100 : 0;
+
+      return {
+        coinId: coin.coinId,
+        name: coin.name || "",
+        symbol: coin.symbol || "",
+        logo: coin.logo || null,
+        price: Number(currentPrice.toFixed(2)),
+        percent_change_1h: Number(coin.percent_change_1h || 0),
+        percent_change_24h: Number(coin.percent_change_24h || 0),
+        percent_change_7d: Number(coin.percent_change_7d || 0),
+        balance: Number(qty.toFixed(8)),
+        value: Number(currentValue.toFixed(2)),
+        profitLoss: Number(profitLoss.toFixed(2)),
+        profitLossPct: Number(profitLossPct.toFixed(2)),
+        market_cap: Number(coin.market_cap || 0),
+        volume_change_24h: Number(coin.volume_change_24h || 0),
+      };
+    });
+
+    // 5. Portfolio totals
+    const totalCurrentValue = items.reduce((sum, c) => sum + c.value, 0);
+    const totalInvestedValue = items.reduce(
+      (sum, c) => sum + c.balance * (c.value / Math.max(c.price, 1)),
+      0
+    );
+    const totalProfitLoss = totalCurrentValue - totalInvestedValue;
+    const totalProfitLossPct =
+      totalInvestedValue > 0 ? (totalProfitLoss / totalInvestedValue) * 100 : 0;
+
+    result.data = {
+      total: coinIds.length,
+      limit: Number(limit) || 10,
+      offset: Number(offset) || 0,
+      totalCurrentValue: Number(totalCurrentValue.toFixed(2)),
+      totalInvestedValue: Number(totalInvestedValue.toFixed(2)),
+      totalProfitLoss: Number(totalProfitLoss.toFixed(2)),
+      totalProfitLossPct: Number(totalProfitLossPct.toFixed(2)),
+      items,
+    };
+  } catch (ex) {
+    console.error("[allAsset] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
 
 exports.stats = async (statsDto, result = {}) => {
   try {
@@ -515,6 +628,44 @@ exports.update = async (updateDto, result = {}) => {
 
     result.data = updated;
   } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.allAssetWithPortfolio = async (byUserIdDto, result = {}) => {
+  try {
+    const { portfolioId, offset, limit } = byUserIdDto;
+
+    if (!portfolioId) {
+      result.ex = new Error("Missing portfolioId");
+      return result;
+    }
+
+    // 1. Get all transactions for the given portfolio
+    const transactions = await Transaction.find({
+      portfolioId: new mongoose.Types.ObjectId(portfolioId),
+    }).lean();
+    console.log(transactions, "transactions");
+    if (!transactions.length) {
+      result.data = [];
+      result.message = "No transactions found for this portfolio";
+      return result;
+    }
+
+    // 3. Fetch only those coins from the Coin collection
+    const coinsData = await Coin.find({ coinId: { $in: coinIds } })
+
+      .skip(Number(offset))
+      .limit(Number(limit))
+      .lean();
+
+    // 4. Response
+    result.data = coinsData;
+    result.total = coinIds.length;
+    result.message = "Unique coins fetched successfully from portfolio";
+  } catch (ex) {
+    console.error("[allAssetWithPortfolio] Error:", ex);
     result.ex = ex;
   } finally {
     return result;

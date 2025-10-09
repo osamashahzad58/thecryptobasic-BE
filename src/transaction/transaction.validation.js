@@ -69,6 +69,13 @@ module.exports = {
       limit: Joi.number().integer().required(),
     }),
   },
+  allAssetWithPortfolio: {
+    query: Joi.object({
+      offset: Joi.number().integer().required(),
+      limit: Joi.number().integer().required(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
   stats: {
     query: Joi.object({
       timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),

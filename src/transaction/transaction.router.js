@@ -27,6 +27,13 @@ router.get(
 
   transactionController.allAsset
 );
+router.get(
+  "/allAssetWithPortfolio",
+  [JWT.verifyAccessToken],
+  [validate(validation.allAssetWithPortfolio, { keyByField: true })],
+
+  transactionController.allAssetWithPortfolio
+);
 
 router.get(
   "/stats",
@@ -40,11 +47,11 @@ router.get(
   [validate(validation.stats, { keyByField: true })],
   transactionController.chart
 );
-// router.put(
-//   "/:id",
-//   [JWT.verifyAccessToken],
-//   [validate(validation.update, { keyByField: true })],
-//   transactionController.update
-// );
+router.put(
+  "/:id",
+  [JWT.verifyAccessToken],
+  [validate(validation.update, { keyByField: true })],
+  transactionController.update
+);
 
 module.exports = router;

@@ -32,7 +32,7 @@ exports.allAsset = async function (req, res, next) {
       limit: req.query?.limit,
       offset: req.query?.offset,
     };
-
+    console.log(byUserIdDto, "byUserIdDto");
     const result = await balanceService.allAsset(byUserIdDto);
 
     if (result.ex) throw result.ex;

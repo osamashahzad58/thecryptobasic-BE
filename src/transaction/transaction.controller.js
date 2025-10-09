@@ -76,6 +76,32 @@ exports.allAsset = async function (req, res, next) {
     next(ex);
   }
 };
+exports.allAssetWithPortfolio = async function (req, res, next) {
+  try {
+    const byUserIdDto = {
+      // userId: req.user?.id,
+      limit: req.query?.limit,
+      offset: req.query?.offset,
+      portfolioId: req.query?.portfolioId,
+    };
+    console.log(byUserIdDto, "byUserIdDto");
+    const result = await transactionService.allAssetWithPortfolio(byUserIdDto);
+
+    if (result.ex) throw result.ex;
+
+    if (result.hasConflict)
+      throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction by User successfully",
+      data: result.data,
+      total: result.total,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.stats = async (req, res, next) => {
   try {
     const statsDto = {

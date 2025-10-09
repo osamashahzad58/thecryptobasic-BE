@@ -551,45 +551,100 @@ exports.deleteNewTokens = async (result = {}) => {
   }
 };
 
+// exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
+//   try {
+//     const { limit, offset, orderField, orderDirection, userId } =
+//       getAllCryptoDto;
+//     console.log(userId, "userId");
+//     const filter = {};
+//     const sortOptions = {
+//       ...(orderField && { [orderField]: +orderDirection || 1 }),
+//     };
+
+//     // 1. Fetch coins and total count
+//     const [coins, count] = await Promise.all([
+//       CmcCoinsModel.find(filter, {}, { sort: sortOptions })
+//         .limit(Number(limit))
+//         .skip((Number(offset) - 1) * Number(limit)),
+//       CmcCoinsModel.countDocuments(filter),
+//     ]);
+
+//     let watchlistCoinIds = new Set();
+
+//     // 2. If userId is provided, fetch user’s watchlist
+//     if (userId) {
+//       const watchlist = await Watchlist.find({ userId }).lean();
+//       watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+//     }
+
+//     // 3. Attach isWatchlist to each coin
+//     const coinsWithWatchlist = coins.map((coin) => ({
+//       ...coin.toObject(),
+//       isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+//     }));
+
+//     // 4. Final response
+//     result.data = {
+//       count,
+//       pages: Math.ceil(count / limit),
+//       coins: coinsWithWatchlist,
+//     };
+//   } catch (ex) {
+//     result.ex = ex;
+//   } finally {
+//     return result;
+//   }
+// };
+
 exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection, userId } =
-      getAllCryptoDto;
-    console.log(userId, "userId");
-    const filter = {};
-    const sortOptions = {
-      ...(orderField && { [orderField]: +orderDirection || 1 }),
-    };
+    const {
+      limit = 10,
+      offset = 1,
+      orderField,
+      orderDirection,
+      userId,
+    } = getAllCryptoDto;
 
-    // 1. Fetch coins and total count
+    const filter = {};
+    const sortOptions = orderField
+      ? { [orderField]: Number(orderDirection) || 1 }
+      : {};
+
+    // 1. Fetch paginated coins and total count
     const [coins, count] = await Promise.all([
       CmcCoinsModel.find(filter, {}, { sort: sortOptions })
         .limit(Number(limit))
-        .skip((Number(offset) - 1) * Number(limit)),
+        .skip((Number(offset) - 1) * Number(limit))
+        .lean(),
       CmcCoinsModel.countDocuments(filter),
     ]);
 
-    let watchlistCoinIds = new Set();
-
-    // 2. If userId is provided, fetch user’s watchlist
+    // 2. Build a map of user's watchlist status
+    let watchlistMap = new Map();
     if (userId) {
       const watchlist = await Watchlist.find({ userId }).lean();
-      watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+      watchlist.forEach((w) => {
+        watchlistMap.set(w.coinId, w.isWatchlist); // store actual true/false
+      });
     }
 
-    // 3. Attach isWatchlist to each coin
+    // 3. Attach `isWatchlist` status to each coin
     const coinsWithWatchlist = coins.map((coin) => ({
-      ...coin.toObject(),
-      isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+      ...coin,
+      isWatchlist: watchlistMap.get(coin.coinId) || false,
     }));
 
-    // 4. Final response
+    // 4. Build response
     result.data = {
       count,
       pages: Math.ceil(count / limit),
       coins: coinsWithWatchlist,
     };
+
+    result.message = "Coins fetched successfully";
   } catch (ex) {
+    console.error("[getAllCrypto] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
@@ -598,14 +653,8 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
 
 exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
   try {
-    const {
-      limit,
-      offset,
-      orderField,
-      orderDirection,
-      skipCoinId,
-      userId, // optional
-    } = getSkipCoinIdDto;
+    const { limit, offset, orderField, orderDirection, skipCoinId, userId } =
+      getSkipCoinIdDto;
 
     // 1. Build filter
     const filter = {};
@@ -614,11 +663,11 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
     }
 
     // 2. Sorting
-    const sortOptions = {
-      ...(orderField && { [orderField]: +orderDirection || 1 }),
-    };
+    const sortOptions = orderField
+      ? { [orderField]: Number(orderDirection) || 1 }
+      : {};
 
-    // 3. Projection (select only required fields)
+    // 3. Projection (fetch only needed fields)
     const projection = {
       name: 1,
       price: 1,
@@ -630,26 +679,28 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
       sparkline_7d: 1,
     };
 
-    // 4. Fetch coins and count
+    // 4. Fetch coins and total count
     const [coins, count] = await Promise.all([
       CmcCoinsModel.find(filter, projection, { sort: sortOptions })
         .limit(Number(limit))
-        .skip((Number(offset) - 1) * Number(limit)),
+        .skip((Number(offset) - 1) * Number(limit))
+        .lean(),
       CmcCoinsModel.countDocuments(filter),
     ]);
 
-    let watchlistCoinIds = new Set();
-
-    // 5. If userId provided, fetch user's watchlist
+    // 5. Build watchlist map (coinId -> isWatchlist)
+    let watchlistMap = new Map();
     if (userId) {
       const watchlist = await Watchlist.find({ userId }).lean();
-      watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+      watchlist.forEach((w) => {
+        watchlistMap.set(w.coinId, w.isWatchlist); // store actual boolean
+      });
     }
 
-    // 6. Attach isWatchlist field
+    // 6. Attach `isWatchlist` status for each coin
     const coinsWithWatchlist = coins.map((coin) => ({
-      ...coin.toObject(),
-      isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+      ...coin,
+      isWatchlist: watchlistMap.get(coin.coinId) || false,
     }));
 
     // 7. Return final result
@@ -658,7 +709,10 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
       pages: Math.ceil(count / limit),
       coins: coinsWithWatchlist,
     };
+
+    result.message = "Coins fetched successfully (excluding skipCoinId)";
   } catch (ex) {
+    console.error("[getSkipCoinId] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
