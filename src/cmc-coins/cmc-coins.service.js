@@ -645,44 +645,68 @@ exports.deleteNewTokens = async (result = {}) => {
 
 exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
-    const {
-      limit = 10,
-      offset = 1,
-      orderField,
-      orderDirection,
-      userId,
-    } = getAllCryptoDto;
+    const { limit, offset, orderField, orderDirection, userId } =
+      getAllCryptoDto;
 
     const filter = {};
     const sortOptions = orderField
       ? { [orderField]: Number(orderDirection) || 1 }
       : {};
 
-    // 1. Fetch paginated coins and total count
+    // 1. Define the fields you actually want
+    const projection = {
+      coinId: 1,
+      name: 1,
+      symbol: 1,
+      logo: 1,
+      price: 1,
+      market_cap: 1,
+      percent_change_1h: 1,
+      percent_change_24h: 1,
+      percent_change_7d: 1,
+      volume_change_24h: 1,
+      sparkline_7d: 1,
+      percent_change_24h: 1,
+      volume_24h: 1,
+    };
+
+    // 2. Fetch paginated coins + total count
     const [coins, count] = await Promise.all([
-      CmcCoinsModel.find(filter, {}, { sort: sortOptions })
+      CmcCoinsModel.find(filter, projection, { sort: sortOptions })
         .limit(Number(limit))
         .skip((Number(offset) - 1) * Number(limit))
         .lean(),
       CmcCoinsModel.countDocuments(filter),
     ]);
 
-    // 2. Build a map of user's watchlist status
+    // 3. Get user’s watchlist (if logged in)
     let watchlistMap = new Map();
     if (userId) {
       const watchlist = await Watchlist.find({ userId }).lean();
       watchlist.forEach((w) => {
-        watchlistMap.set(w.coinId, w.isWatchlist); // store actual true/false
+        watchlistMap.set(w.coinId, w.isWatchlist); // true / false
       });
     }
 
-    // 3. Attach `isWatchlist` status to each coin
+    // 4. Attach isWatchlist to each coin
     const coinsWithWatchlist = coins.map((coin) => ({
-      ...coin,
+      coinId: coin.coinId,
+      name: coin.name,
+      symbol: coin.symbol,
+      logo: coin.logo,
+      sparkline_7d: coin.sparkline_7d,
+      percent_change_24h: coin.percent_change_24h,
+      price: Number(coin.price || 0),
+      market_cap: Number(coin.market_cap || 0),
+      percent_change_1h: Number(coin.percent_change_1h || 0),
+      percent_change_24h: Number(coin.percent_change_24h || 0),
+      percent_change_7d: Number(coin.percent_change_7d || 0),
+      volume_change_24h: Number(coin.volume_change_24h || 0),
+      volume_24h: Number(coin.volume_24h || 0),
       isWatchlist: watchlistMap.get(coin.coinId) || false,
     }));
 
-    // 4. Build response
+    // 5. Return final response
     result.data = {
       count,
       pages: Math.ceil(count / limit),
