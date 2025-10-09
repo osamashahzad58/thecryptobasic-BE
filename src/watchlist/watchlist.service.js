@@ -99,6 +99,8 @@ exports.byUserId = async ({ userId }, result = {}) => {
           volume_change_24h: 1,
           circulating_supply: 1,
           total_supply: 1,
+          sparkline_7d: 1,
+          volume_24h: 1,
         }
       )
       .lean();
