@@ -27,6 +27,7 @@ router.get(
 
   transactionController.allAsset
 );
+
 router.get(
   "/allAssetWithPortfolio",
   [JWT.verifyAccessToken],
@@ -53,5 +54,6 @@ router.put(
   [validate(validation.update, { keyByField: true })],
   transactionController.update
 );
+router.delete("/:id", [JWT.verifyAccessToken], transactionController.delete);
 
 module.exports = router;

@@ -18,7 +18,7 @@ exports.create = async function (req, res, next) {
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: "watchlist create successfully",
+      message: "balance create successfully",
       data: result.data,
     });
   } catch (ex) {

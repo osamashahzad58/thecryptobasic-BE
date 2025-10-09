@@ -163,3 +163,25 @@ exports.update = async function (req, res, next) {
     next(ex);
   }
 };
+exports.delete = async function (req, res, next) {
+  try {
+    const deleteDto = {
+      id: req.params.id,
+      userId: req.user?.id,
+    };
+
+    const result = await transactionService.delete(deleteDto);
+
+    if (result.ex) throw result.ex;
+    if (!result.data)
+      throw createError(StatusCodes.NOT_FOUND, "Transaction not found");
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction delete successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

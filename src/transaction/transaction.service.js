@@ -633,6 +633,40 @@ exports.update = async (updateDto, result = {}) => {
     return result;
   }
 };
+exports.delete = async (deleteDto, result = {}) => {
+  try {
+    const { id, userId } = deleteDto;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      result.ex = new Error("Invalid transaction ID");
+      return result;
+    }
+
+    // Ensure transaction belongs to the user
+    const filter = { _id: id, userId };
+
+    // Find the transaction first
+    const existingTx = await Transaction.findOne(filter);
+    if (!existingTx) {
+      result.data = null;
+      result.message = "Transaction not found";
+      return result;
+    }
+
+    // Delete the transaction
+    await Transaction.deleteOne({ _id: existingTx._id });
+
+    // Return deleted data
+    result.data = existingTx;
+    result.message = "Transaction deleted successfully";
+  } catch (ex) {
+    console.error("[Transaction.delete] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
 exports.allAssetWithPortfolio = async (byUserIdDto, result = {}) => {
   try {
     const { portfolioId, offset, limit } = byUserIdDto;
