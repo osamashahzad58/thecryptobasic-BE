@@ -40,20 +40,18 @@ exports.signup = async (req, res, next) => {
 
     if (result.hasConflict) {
       const conflictStatus = StatusCodes.CONFLICT;
-      const conflictMessage = result.conflictMessage;
-      const conflictField = result.conflictField;
-
       return res.status(conflictStatus).json({
         statusCode: conflictStatus,
-        message: conflictMessage,
-        conflictField: conflictField,
-        existingUser: result.existingUser, // Include existing user data for better information
+        message: result.conflictMessage,
+        conflictField: result.conflictField,
+        existingUser: result.existingUser, // agar service se mile
       });
     }
 
     return res.status(StatusCodes.CREATED).json({
       statusCode: StatusCodes.CREATED,
-      message: "Account Is Created Successfully",
+      message: "Account is created successfully",
+      data: result.data, // ab isme accessToken aur refreshToken dono honge
     });
   } catch (ex) {
     next(ex);
@@ -178,6 +176,7 @@ exports.forgetPassword = async (req, res, next) => {
     return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Password reset link sent via email",
+      data: result.data,
     });
   } catch (ex) {
     next(ex);
@@ -231,7 +230,7 @@ exports.resetPassword = async (req, res, next) => {
 exports.signupWithGoogle = async (req, res, next) => {
   try {
     const { code } = req.body; // frontend se "authorization_code" bhejna hai
-
+    console.log(code, "code");
     if (!code) {
       throw createError(
         StatusCodes.BAD_REQUEST,

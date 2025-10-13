@@ -1,15 +1,15 @@
 const { StatusCodes } = require("http-status-codes");
 const createError = require("http-errors");
-const watchlistService = require("./watchlist.service");
+const balanceService = require("./balance.service");
 
 exports.create = async function (req, res, next) {
   try {
     const createDto = {
+      ...req.body,
       userId: req.user?.id,
-      coinId: req.params?.coinId,
     };
 
-    const result = await watchlistService.create(createDto);
+    const result = await balanceService.create(createDto);
 
     if (result.ex) throw result.ex;
 
@@ -18,20 +18,22 @@ exports.create = async function (req, res, next) {
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: "watchlist create successfully",
+      message: "balance create successfully",
       data: result.data,
     });
   } catch (ex) {
     next(ex);
   }
 };
-exports.byUserId = async function (req, res, next) {
+exports.allAsset = async function (req, res, next) {
   try {
     const byUserIdDto = {
       userId: req.user?.id,
+      limit: req.query?.limit,
+      offset: req.query?.offset,
     };
-
-    const result = await watchlistService.byUserId(byUserIdDto);
+    console.log(byUserIdDto, "byUserIdDto");
+    const result = await balanceService.allAsset(byUserIdDto);
 
     if (result.ex) throw result.ex;
 
@@ -40,43 +42,51 @@ exports.byUserId = async function (req, res, next) {
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: "watchlist by User successfully",
+      message: "balance by User successfully",
       data: result.data,
     });
   } catch (ex) {
     next(ex);
   }
 };
-exports.toggle = async function (req, res, next) {
+exports.getList = async function (req, res, next) {
   try {
-    const userId = req.user?.id;
-    const coinId = req.query?.coinId;
+    const getListDto = {
+      userId: req.user?.id,
+    };
 
-    const result = await watchlistService.toggle(userId, coinId);
+    const result = await balanceService.getList(getListDto);
 
     if (result.ex) throw result.ex;
 
+    if (result.hasConflict)
+      throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: result.message,
+      message: "balance by User successfully",
       data: result.data,
     });
   } catch (ex) {
     next(ex);
   }
 };
-exports.toggleMultiple = async function (req, res, next) {
+exports.getCombinePortfolio = async function (req, res, next) {
   try {
-    const userId = req.user?.id;
-    const coinIds = req.body?.coinIds;
+    const getListDto = {
+      userId: req.user?.id,
+    };
 
-    const result = await watchlistService.toggleMultiple(userId, coinIds);
+    const result = await balanceService.getCombinePortfolio(getListDto);
 
     if (result.ex) throw result.ex;
 
+    if (result.hasConflict)
+      throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: result.message,
+      message: "balance by User successfully",
       data: result.data,
     });
   } catch (ex) {

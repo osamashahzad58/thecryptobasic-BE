@@ -32,5 +32,30 @@ router.get(
   JWT.verifyAccessToken,
   usersController.getUserWatchlist
 );
+router.post(
+  "/verify-otp",
+  [
+    JWT.verifyAccessToken,
+    validate(usersValidation.verifyOtp, { keyByField: true }),
+  ],
+  usersController.verifyOtp
+);
+router.post(
+  "/restPassword",
+  [
+    JWT.verifyAccessToken,
+    validate(usersValidation.restPassword, { keyByField: true }),
+  ],
+  usersController.restPassword
+);
+
+router.post(
+  "/send-otp",
+  [
+    // JWT.verifyAccessToken,
+    validate(usersValidation.sendOtp, { keyByField: true }),
+  ],
+  usersController.sendOtp
+);
 
 module.exports = router;

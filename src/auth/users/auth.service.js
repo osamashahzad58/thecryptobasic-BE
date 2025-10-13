@@ -5,24 +5,29 @@ const configs = require("../../../configs");
 const JWT = require("../../common/auth/jwt");
 const redisClient = require("../../../helpers/redis");
 const USERS_EVENTS = require("../../users/constants/users.events.constants");
+const EMAIL_VERIFICATION_EVENTS = require("../../users/constants/users.events.constants");
 const eventEmitter = require("../../common/events/events.event-emitter");
 const CONSTANTS = require("../../common/constants/constants");
 const cryptoUtils = require("../../common/crypto/crypto.util");
 const { googleAuthenticate } = require("../../common/google/googleAuth");
 
+const otpGenerator = require("otp-generator");
+
 exports.signin = async (signInDto, result = {}) => {
   try {
-    const { email, password, rememberMe } = signInDto;
+    const { email, username, password, rememberMe } = signInDto;
 
-    const response = await usersService.findUserByEmailOrUsername({ email });
+    const response = await usersService.findUserByEmailOrUsername({
+      email,
+    });
     if (response.ex) throw response.ex;
     const user = response.data;
 
     if (user && (await user.isPasswordValid(password))) {
-      // extract safe values from user
+      // extract safe values
       const { password, ...safeUserData } = user._doc;
 
-      // generate access & refresh token
+      // generate tokens
       const [accessToken, refreshToken] = await Promise.all([
         JWT.signToken(
           {
@@ -42,44 +47,103 @@ exports.signin = async (signInDto, result = {}) => {
         ),
       ]);
 
-      // store refresh token in redis
-      // await redisClient.set(safeUserData._id, refreshToken, {
-      //   EX: configs.jwt.refreshToken.redisTTL,
-      // });
-      rememberMe
-        ? await redisClient.set(safeUserData._id.toString(), refreshToken, {
-            EX: configs.jwt.refreshToken.redisRemeberMeTTL,
-          })
-        : await redisClient.set(safeUserData._id.toString(), refreshToken, {
-            EX: configs.jwt.refreshToken.redisTTL,
-          });
+      // save refresh token
+      const ttl = rememberMe
+        ? configs.jwt.refreshToken.redisRemeberMeTTL
+        : configs.jwt.refreshToken.redisTTL;
+
+      await redisClient.set(safeUserData._id.toString(), refreshToken, {
+        EX: ttl,
+      });
 
       result.data = {
-        user: {
-          ...safeUserData,
-        },
+        ...safeUserData,
         accessToken,
         refreshToken,
-        role,
-        kycVerified,
-        kycStatus,
-        isKycVerified,
       };
     }
-    console.log(result.data, "console.log(result.data)");
   } catch (ex) {
     result.ex = ex;
   } finally {
     return result;
   }
 };
+
+// exports.signup = async (signUpDto, result = {}) => {
+//   try {
+//     const response = await usersService.createUser(signUpDto);
+
+//     if (response.ex) throw response.ex;
+
+//     result.data = response.data;
+//   } catch (ex) {
+//     if (
+//       ex.name === CONSTANTS.DATABASE_ERROR_NAMES.MONGO_SERVER_ERROR &&
+//       ex.code === CONSTANTS.DATABASE_ERROR_CODES.UNIQUE_VIOLATION
+//     ) {
+//       const uniqueViolaterMessage = ex.message.split("{ ")[1];
+//       const uniqueViolaterField = uniqueViolaterMessage.split(":")[0];
+//       result.conflictMessage = `A user with ${uniqueViolaterField} already exist`;
+//       result.conflictField = uniqueViolaterField;
+//       result.hasConflict = true;
+//     } else {
+//       result.ex = ex;
+//     }
+//   } finally {
+//     return result;
+//   }
+// };
 exports.signup = async (signUpDto, result = {}) => {
   try {
     const response = await usersService.createUser(signUpDto);
 
     if (response.ex) throw response.ex;
 
-    result.data = response.data;
+    const user = response.data;
+
+    // Normalize _id to id (important for JWT)
+    const userId = user.id || user._id?.toString();
+    if (!userId) {
+      throw new Error(
+        `User object is invalid. Missing id. Got: ${JSON.stringify(user)}`
+      );
+    }
+
+    // safe user data
+    const safeUserData = {
+      id: userId,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      otpExpiresTime: user.otpExpiresTime,
+    };
+
+    // generate access & refresh token
+    const [accessToken, refreshToken] = await Promise.all([
+      JWT.signToken(
+        {
+          id: safeUserData.id,
+          email: safeUserData.email,
+          role: safeUserData.role,
+        },
+        JWT_TOKEN_TYPES.ACCESS_TOKEN
+      ),
+      JWT.signToken(
+        {
+          id: safeUserData.id,
+          email: safeUserData.email,
+          role: safeUserData.role,
+        },
+        JWT_TOKEN_TYPES.REFRESH_TOKEN
+      ),
+    ]);
+
+    // merge tokens + otpExpiresTime inside data
+    result.data = {
+      ...safeUserData,
+      accessToken,
+      refreshToken,
+    };
   } catch (ex) {
     if (
       ex.name === CONSTANTS.DATABASE_ERROR_NAMES.MONGO_SERVER_ERROR &&
@@ -87,7 +151,7 @@ exports.signup = async (signUpDto, result = {}) => {
     ) {
       const uniqueViolaterMessage = ex.message.split("{ ")[1];
       const uniqueViolaterField = uniqueViolaterMessage.split(":")[0];
-      result.conflictMessage = `A user with ${uniqueViolaterField} already exist`;
+      result.conflictMessage = `A user with ${uniqueViolaterField} already exists`;
       result.conflictField = uniqueViolaterField;
       result.hasConflict = true;
     } else {
@@ -97,6 +161,7 @@ exports.signup = async (signUpDto, result = {}) => {
     return result;
   }
 };
+
 // exports.registerUser = async (registersDto, result = {}) => {
 //   try {
 //     const { walletAddress } = registersDto;
@@ -424,9 +489,67 @@ exports.refreshToken = async (refreshTokenDto, result = {}) => {
 
 exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
   try {
-    const { email } = forgetPasswordDto;
-    const response = await usersService.findUserByEmail(email);
+    const { email, rememberMe = false } = forgetPasswordDto;
+    console.log(forgetPasswordDto, "forgetPasswordDto");
 
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCaseAlphabets: false,
+      upperCase: false,
+      lowerCaseAlphabets: false,
+      lowerCase: false,
+      specialChars: false,
+    });
+    const user = await User.findOne({ email, role: "user" });
+    if (!user) {
+      result.userNotFound = true;
+      return;
+    }
+
+    const response = await usersService.findUserByEmail(email);
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.otp = otp;
+    user.otpExpiresTime = expiryTime;
+    user.isEmailVerified = false;
+    const data = await user.save();
+
+    // generate tokens
+    const [accessToken, refreshToken] = await Promise.all([
+      JWT.signToken(
+        {
+          id: data._id,
+          email: data?.email,
+          role: data.role,
+        },
+        JWT_TOKEN_TYPES.ACCESS_TOKEN
+      ),
+      JWT.signToken(
+        {
+          id: data._id,
+          email: data?.email,
+          role: data.role,
+        },
+        JWT_TOKEN_TYPES.REFRESH_TOKEN
+      ),
+    ]);
+
+    // save refresh token
+    const ttl = rememberMe
+      ? configs.jwt.refreshToken.redisRemeberMeTTL
+      : configs.jwt.refreshToken.redisTTL;
+
+    await redisClient.set(data._id.toString(), refreshToken, {
+      EX: ttl,
+    });
+
+    result.data = {
+      email: data.email,
+      otpExpiresTime: data.otpExpiresTime,
+      accessToken,
+      refreshToken,
+      forget: true,
+    };
     if (response.ex) throw response.ex;
 
     if (!response.data) {
@@ -434,17 +557,15 @@ exports.forgetPassword = async (forgetPasswordDto, result = {}) => {
     } else {
       result.userExist = true;
       const user = response.data;
-      user.passwordResetToken = await JWT.signPasswordResetToken();
       await user.save();
-
-      const passwordResetLink = `${configs.frontEndUrl}/reset-password?token=${user.passwordResetToken}`;
-
-      eventEmitter.emit(USERS_EVENTS.FORGOT_PASSWORD, {
-        receiverEmail: user.email,
-        name: user.name,
-        passwordResetLink,
-      });
     }
+
+    // Trigger email event
+    eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.FORGOT_PASSWORD, {
+      receiverEmail: email,
+      name: user?.userName,
+      codeVerify: otp,
+    });
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -554,26 +675,48 @@ exports.signupWithGoogle = async (code, result = {}) => {
     const { payload } = await googleAuthenticate(code);
     const { email, name, picture } = payload;
 
-    let user = await usersService.findByEmail(email);
+    let userResult = await usersService.findUserByEmail(email);
 
+    // normalize: remove the { data: null } problem
+    let user = userResult?.data || userResult || null;
+    if (user && user.data === null) {
+      user = null;
+    }
+
+    // create if not exists
     if (!user) {
-      user = await usersService.create({
+      const createdUser = await usersService.createUser({
         email,
         name,
         profilePicture: picture,
         provider: "google",
       });
+      user = createdUser?.data || createdUser || null;
     }
 
-    const token = JWT.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+    if (!user) {
+      throw new Error("User creation failed, got null user");
+    }
+
+    // normalize mongoose doc
+    const plainUser = user.toObject?.() || user._doc || user;
+    const userId = plainUser.id || plainUser._id?.toString();
+    if (!userId) {
+      throw new Error(
+        `User object is invalid. Got: ${JSON.stringify(plainUser)}`
+      );
+    }
+
+    const accessToken = await JWT.signToken(
+      { id: userId, email: plainUser.email },
+      JWT_TOKEN_TYPES.ACCESS_TOKEN,
+      true
     );
 
-    result.data = { user, token };
+    result.data = { ...plainUser, accessToken };
   } catch (ex) {
     result.ex = ex;
+    result.data = null;
   } finally {
     return result;
   }

@@ -43,6 +43,12 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       min: [0, "Quantity must be positive"],
     },
+    portfolioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "portfolio",
+      required: true,
+      index: true,
+    },
     fee: {
       type: Number,
       default: 0,

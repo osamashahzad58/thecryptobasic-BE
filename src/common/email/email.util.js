@@ -3,6 +3,8 @@ const configs = require("../../../configs");
 sgMail.setApiKey(configs.sendgrid.apiKey);
 const client = require("@sendgrid/client");
 const moment = require("moment");
+const axios = require("axios");
+const qs = require("qs");
 
 exports.loginCredentialsMail = async (
   loginCredentialsEmailPayload,
@@ -39,98 +41,103 @@ exports.sendPasswordResetEmail = async function (
   result = {}
 ) {
   try {
-    const { receiverEmail, name, passwordResetLink } =
-      resetPasswordEmailPayload;
+    const { receiverEmail, name, codeVerify } = resetPasswordEmailPayload;
 
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.passwordResetEmailTemplateId,
-      dynamicTemplateData: {
-        name,
-        passwordResetLink,
-      },
+    // Validate input
+    if (
+      !receiverEmail ||
+      typeof receiverEmail !== "string" ||
+      !receiverEmail.includes("@")
+    ) {
+      throw new Error("Invalid recipient email address.");
+    }
+
+    if (!codeVerify) {
+      throw new Error("OTP Code is required.");
+    }
+
+    const emailPayload = {
+      to: String(receiverEmail).trim(),
+      subject: "Your OTP Code",
+      apiKey: configs.elasticEmail.apiKey,
+      from: "hashim@thecryptobasic.com",
+      fromName: "TheCryptoBasic",
+      template: configs.elasticEmail.passwordResetTemplate,
+      merge_otpCode: codeVerify,
+      merge_userName: name,
+      isTransactional: true,
     };
-    const res = await sgMail.send(msg);
+    console.log(
+      emailPayload,
+      configs.elasticEmail.apiKey,
+      configs.elasticEmail.sendOtp,
+      "emailPayload"
+    );
+
+    const response = await axios.post(
+      "https://api.elasticemail.com/v2/email/send",
+      qs.stringify(emailPayload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    result.response = response.data;
   } catch (ex) {
+    console.error("Elastic Email Error:", ex.response?.data || ex.message);
     result.ex = ex;
   } finally {
     return result;
   }
 };
-
-exports.sendPasswordUpdateSuccessEmail = async function (
-  passwordUpdateDto,
-  result = {}
-) {
+exports.sendEmail = async function (sendEmailPayload, result = {}) {
   try {
-    const { receiverEmail, name } = passwordUpdateDto;
+    const { receiverEmail, codeVerify } = sendEmailPayload;
+    // Validate input
+    if (
+      !receiverEmail ||
+      typeof receiverEmail !== "string" ||
+      !receiverEmail.includes("@")
+    ) {
+      throw new Error("Invalid recipient email address.");
+    }
 
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.passwordResetSuccessEmailTemplateId,
-      dynamicTemplateData: {
-        name,
-      },
-    };
-    const res = await sgMail.send(msg);
-  } catch (ex) {
-    result.ex = ex;
-  } finally {
-    return result;
-  }
-};
-exports.sendAboutUsEmail = async (aboutUsEmailPayload, result = {}) => {
-  try {
-    const { firstName, lastName, email, message } = aboutUsEmailPayload;
+    if (!codeVerify) {
+      throw new Error("OTP Code is required.");
+    }
 
-    const msg = {
-      to: configs.sendgrid.adminEmailAddress,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.aboutUsEmailTemplateId,
-      dynamicTemplateData: {
-        name: firstName + " " + lastName,
-        email: email,
-        message: message,
-      },
+    const emailPayload = {
+      to: String(receiverEmail).trim(),
+      subject: "Your OTP Code",
+      apiKey: configs.elasticEmail.apiKey,
+      from: "hashim@thecryptobasic.com",
+      fromName: "TheCryptoBasic",
+      template: configs.elasticEmail.sendOtp,
+      merge_otpCode: codeVerify,
+      isTransactional: true,
     };
-    const res = await sgMail.send(msg);
+
+    const response = await axios.post(
+      "https://api.elasticemail.com/v2/email/send",
+      qs.stringify(emailPayload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    result.response = response.data;
+    // Check response success
+    if (!response.data.success) {
+      throw new Error(
+        `Elastic Email API Error: ${response.data.error || "Unknown error"}`
+      );
+    }
   } catch (ex) {
-    result.ex = ex;
-  } finally {
-    return result;
-  }
-};
-exports.sendEmailVerificationCode = async function (
-  confirmEmailPayload,
-  result = {}
-) {
-  try {
-    const { receiverEmail, emailVerificationLink, codeVerify } =
-      confirmEmailPayload;
-    const msg = {
-      to: receiverEmail,
-      from: {
-        email: configs.sendgrid.sender,
-        name: configs.sendgrid.senderName,
-      },
-      templateId: configs.sendgrid.verificationEmailTemplateId,
-      dynamicTemplateData: {
-        codeVerify,
-      },
-    };
-    const res = await sgMail.send(msg);
-  } catch (ex) {
+    console.error("Elastic Email Error:", ex.response?.data || ex.message);
     result.ex = ex;
   } finally {
     return result;
@@ -187,7 +194,6 @@ exports.sendEmailDataRequest = async function (
 exports.sendEmailDispute = async function (confirmEmailPayload, result = {}) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "emails:::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -236,7 +242,6 @@ exports.sendEmailDisputeWin = async function (
 ) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "sendEmailDisputeWin::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -293,7 +298,6 @@ exports.sendEmailDisputeLos = async function (
 ) {
   try {
     const { emails } = confirmEmailPayload;
-    console.log(emails, "sendEmailDisputeLos::::::::::::::::::::::");
     if (!emails || emails.length === 0) {
       return result;
     }
@@ -482,12 +486,9 @@ exports.sendEmailToAskerLoserDispute = async function (
         },
       });
     }
-    console.log("SendGrid emailMessages:", emailMessages);
 
     const res = await sgMail.send(emailMessages);
-    console.log("SendGrid response:", res);
   } catch (ex) {
-    console.error("Error sending email:", ex);
     result.ex = ex;
   } finally {
     return result;

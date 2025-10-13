@@ -42,12 +42,27 @@ exports.profile = async function (req, res, next) {
   }
 };
 
+exports.getUserWatchlist = async function (req, res, next) {
+  try {
+    const { id: userId } = req.user;
+    const result = await usersService.getUserWatchlist({ userId });
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User watchlist data",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+
 exports.sendOtp = async (req, res, next) => {
   try {
     const sendOtpDto = {
-      id: req.user.id,
-      role: req.user.role,
-      walletAddress: req.user.walletAddress,
+      // id: req.user.id,
+      // role: req.user.role,
       ...req.body,
     };
     const result = await usersService.sendOtp(sendOtpDto);
@@ -72,6 +87,7 @@ exports.sendOtp = async (req, res, next) => {
     return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Otp Send successfully",
+      data: result.data,
     });
   } catch (ex) {
     next(ex);
@@ -82,7 +98,6 @@ exports.verifyOtp = async (req, res, next) => {
   try {
     const verifyOtpDto = {
       id: req.user.id,
-      walletAddress: req.user.walletAddress,
       ...req.body,
     };
     const result = await usersService.verifyOtp(verifyOtpDto);
@@ -106,16 +121,27 @@ exports.verifyOtp = async (req, res, next) => {
     next(ex);
   }
 };
-exports.getUserWatchlist = async function (req, res, next) {
+exports.restPassword = async (req, res, next) => {
   try {
-    const { id: userId } = req.user;
-    const result = await usersService.getUserWatchlist({ userId });
+    const restPasswordDto = {
+      ...req.body,
+    };
+    const result = await usersService.restPassword(restPasswordDto);
+
     if (result.ex) throw result.ex;
 
-    res.status(StatusCodes.OK).json({
+    if (result.userNotFound)
+      throw createError(StatusCodes.NOT_FOUND, "User not found");
+
+    if (result.optCodeIncorrect)
+      throw createError(StatusCodes.BAD_REQUEST, "Otp is incorrect");
+
+    if (result.otpExpired)
+      throw createError(StatusCodes.GONE, "Otp is expired");
+
+    return res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: "User watchlist data",
-      data: result.data,
+      message: "Otp verified successfully",
     });
   } catch (ex) {
     next(ex);

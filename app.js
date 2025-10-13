@@ -3,12 +3,14 @@ const express = require("express");
 const { applyMiddlewares, applyErrorMdiddlewares } = require("./middleware");
 const { initRoutes } = require("./src/router");
 const redisClient = require("./helpers/redis");
+const { registerSubscribers } = require("./subscribers");
 
 // Create app instance
 const app = express();
 
 // DB init
 require("./helpers/db");
+registerSubscribers();
 
 // Redis init
 (async () => {

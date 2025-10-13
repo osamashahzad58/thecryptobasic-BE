@@ -21,12 +21,32 @@ module.exports = {
       limit: Joi.number().integer().required(),
     }),
   },
-  getCompare: {
+
+  getConverter: {
     query: Joi.object({
       tokenA: Joi.string().required(),
       tokenB: Joi.string().required(),
     }),
   },
+  getCompare: {
+    query: Joi.object({
+      coinIds: Joi.alternatives()
+        .try(
+          Joi.array().items(Joi.string().trim().min(1)).min(1),
+          Joi.string()
+            .trim()
+            .pattern(/^[^,]+(,[^,]+)*$/) // comma-separated list of coinIds
+        )
+        .required()
+        .messages({
+          "any.required": "coinIds field is required",
+          "string.pattern.base":
+            "coinIds must be comma-separated or an array of strings",
+          "array.min": "Provide at least one coinId",
+        }),
+    }),
+  },
+
   address: {
     query: Joi.object({
       address: Joi.string().trim().required(),
@@ -53,9 +73,24 @@ module.exports = {
   AllCrypto: {
     query: Joi.object({
       limit: Joi.number().positive().required(),
+      userId: Joi.string().trim().optional(),
       search: Joi.string().optional(),
       offset: Joi.number().positive().required(),
       orderField: Joi.string().valid("price"),
+      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
+        is: Joi.exist(),
+        then: Joi.required(),
+      }),
+    }),
+  },
+  skipCoinId: {
+    query: Joi.object({
+      limit: Joi.number().positive().required(),
+      userId: Joi.string().trim().optional(),
+      skipCoinId: Joi.string().required(), // coinId to skip
+      search: Joi.string().optional(),
+      offset: Joi.number().positive().required(),
+      orderField: Joi.string().valid("price", "createdAt"),
       orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
         is: Joi.exist(),
         then: Joi.required(),

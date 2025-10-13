@@ -3,16 +3,17 @@ const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const CmcCoinsNew = require("./models/cmc-new.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
+const CoinsTrending = require("./models/cmc-trending.model");
 const CoinsGainer = require("./models/cmc-topGainners.model");
 const CoinsMostVisited = require("./models/cmc-mostVisited.model");
 const CoinsStats = require("./models/cmc-stats.model");
+const Watchlist = require("../watchlist/watchlist.model");
 
 exports.create = async (createDto, result = {}) => {
   try {
-    console.log("getting list");
     const list = await CmcCoinsModel.create(createDto);
-    console.log("checked list");
 
     result.data = list;
   } catch (ex) {
@@ -151,13 +152,33 @@ exports.getPriceChart = async (getPriceChartsDto, result = {}) => {
     return result;
   }
 };
-exports.getCompare = async (getCompareDto, result = {}) => {
+exports.getConverter = async (getConverterDto = {}, result = {}) => {
   try {
-    const { tokenA, tokenB } = getCompareDto;
+    const { tokenA, tokenB } = getConverterDto;
+    console.log(getConverterDto, "getConverterDto");
 
+    if (!tokenA || !tokenB) {
+      result.error = true;
+      result.message = "Both tokenA and tokenB are required.";
+      return result;
+    }
+
+    // Try to match by coinId, symbol, or name (case-insensitive)
     const [coinA, coinB] = await Promise.all([
-      CmcCoinsModel.findOne({ name: { $regex: `^${tokenA}$`, $options: "i" } }),
-      CmcCoinsModel.findOne({ name: { $regex: `^${tokenB}$`, $options: "i" } }),
+      CmcCoinsModel.findOne({
+        $or: [
+          { coinId: tokenA },
+          { symbol: { $regex: `^${tokenA}$`, $options: "i" } },
+          { name: { $regex: `^${tokenA}$`, $options: "i" } },
+        ],
+      }),
+      CmcCoinsModel.findOne({
+        $or: [
+          { coinId: tokenB },
+          { symbol: { $regex: `^${tokenB}$`, $options: "i" } },
+          { name: { $regex: `^${tokenB}$`, $options: "i" } },
+        ],
+      }),
     ]);
 
     if (!coinA || !coinB) {
@@ -165,36 +186,63 @@ exports.getCompare = async (getCompareDto, result = {}) => {
       result.message = "One or both coins not found.";
       return result;
     }
-    const priceA = parseFloat(coinA.price);
-    const marketCapA = parseFloat(coinA.market_cap);
-    const marketCapB = parseFloat(coinB.market_cap);
+
+    // Parse values safely
+    const priceA = parseFloat(coinA.price) || 0;
+    const priceB = parseFloat(coinB.price) || 0;
+    const marketCapA = parseFloat(coinA.market_cap) || 0;
+    const marketCapB = parseFloat(coinB.market_cap) || 0;
+
+    if (!priceA || !marketCapA || !marketCapB) {
+      result.error = true;
+      result.message = "Invalid or missing market data for one or both coins.";
+      return result;
+    }
+
+    // Calculate conversion
     const calculatedPrice = (marketCapB / marketCapA) * priceA;
     const multiplier = marketCapB / marketCapA;
+
+    // Format currency
     const formatCurrency = (num) =>
       `$${num.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
 
-    const formattedComparison = `${formatCurrency(
-      calculatedPrice
-    )} (${multiplier.toFixed(2)}x)`;
     result.data = {
       tokenA: {
         name: coinA.name,
         symbol: coinA.symbol,
+        logo: coinA.logo,
+        volume_change_24h: coinA.volume_change_24h,
+        volume_24h: coinA.volume_24h,
+        percent_change_24h: coinA.percent_change_24h,
         price: priceA,
         marketCap: marketCapA,
       },
       tokenB: {
         name: coinB.name,
         symbol: coinB.symbol,
-        price: parseFloat(coinB.price),
+        logo: coinB.logo,
+        volume_change_24h: coinB.volume_change_24h,
+        volume_24h: coinB.volume_24h,
+        percent_change_24h: coinB.percent_change_24h,
+        price: priceB,
         marketCap: marketCapB,
       },
-      comparison: formattedComparison,
+      comparison: {
+        calculatedPrice,
+        formatted: `${formatCurrency(calculatedPrice)} (${multiplier.toFixed(
+          2
+        )}x)`,
+        multiplier: Number(multiplier.toFixed(4)),
+      },
     };
+
+    result.message = "Conversion calculated successfully.";
   } catch (ex) {
+    console.error("[getConverter] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
@@ -344,16 +392,9 @@ exports.getById = async (getPricePerformanceStatsDto) => {
   const result = {};
   try {
     const { id } = getPricePerformanceStatsDto;
+    const dbData = await CmcCoinsModel.findOne({ coinId: String(id) });
 
-    const detailsUrl = `https://pro-api.coingecko.com/api/v3/coins/${id}?localization=true&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
-
-    const detailsResponse = await axios.get(detailsUrl, {
-      headers: {
-        "x-cg-pro-api-key": configs.privateKeys.ApiKeyCoingeko,
-      },
-    });
-
-    const detailsData = detailsResponse.data;
+    const detailsData = dbData;
 
     if (!detailsData || !detailsData.id) {
       throw new Error(`No data found for ID: ${id}`);
@@ -368,8 +409,67 @@ exports.getById = async (getPricePerformanceStatsDto) => {
       result.error = error.message;
     }
   }
-
   return result;
+};
+exports.chartbyId = async ({ id }) => {
+  const result = {};
+  try {
+    // Coin ke data lao
+    const dbData = await CmcCoinsModel.findOne(
+      { coinId: String(id) },
+      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
+    ).lean();
+
+    if (!dbData || !dbData.chart) {
+      throw new Error(`No chart data found for ID: ${id}`);
+    }
+
+    // chart ko filter karo -> sirf price, volume, timestamp rakho
+    const chart = dbData.chart.map((c) => ({
+      market_cap: c.market_cap,
+      volume: c.volume,
+      timestamp: c.timestamp,
+      // name: dbData.name,
+    }));
+
+    result.data = chart;
+    result.message = "Chart data fetched successfully";
+  } catch (ex) {
+    console.error("Error response:", ex.message);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};
+exports.volumeChartbyId = async ({ id }) => {
+  const result = {};
+  try {
+    // Coin ke data lao
+    const dbData = await CmcCoinsModel.findOne(
+      { coinId: String(id) },
+      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
+    ).lean();
+
+    if (!dbData || !dbData.chart) {
+      throw new Error(`No chart data found for ID: ${id}`);
+    }
+
+    // chart ko filter karo -> sirf price, volume, timestamp rakho
+    const chart = dbData.chart.map((c) => ({
+      price: c.price,
+      volume: c.volume,
+      timestamp: c.timestamp,
+      // name: dbData.name,
+    }));
+
+    result.data = chart;
+    result.message = "Chart data fetched successfully";
+  } catch (ex) {
+    console.error("Error response:", ex.message);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
 };
 
 exports.getCoinByIdWithCMC = async (getPricePerformanceStatsDto) => {
@@ -420,9 +520,34 @@ exports.addLoserGainers = async (addLoserGainers, result = {}) => {
     return result;
   }
 };
+exports.addTrending = async (addTrending, result = {}) => {
+  try {
+    result.data = await CoinsTrending.insertMany(addTrending, {
+      ordered: false,
+      rawResult: false,
+    });
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.addNewTokens = async (coins) => {
+  try {
+    const inserted = await CmcCoinsNew.insertMany(coins, {
+      ordered: false, // skip duplicates instead of failing
+    });
+    return inserted;
+  } catch (ex) {
+    console.error("Error in addNewTokens:", ex.message);
+    if (ex.writeErrors) {
+      console.error("Write errors:", ex.writeErrors);
+    }
+    throw ex;
+  }
+};
 exports.addMostVisited = async (addMostVisited, result = {}) => {
   try {
-    console.log("addMostVisited");
     result.data = await CoinsMostVisited.insertMany(addMostVisited);
   } catch (ex) {
     result.ex = ex;
@@ -452,34 +577,219 @@ exports.deleteMostVisited = async (result = {}) => {
     return result;
   }
 };
-exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
+exports.deleteTrending = async (result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection } = getAllCryptoDto;
-
-    const filter = {};
-
-    const sortOptions = {
-      ...(orderField && { [orderField]: +orderDirection }),
-    };
-
-    const [coins, count] = await Promise.all([
-      CmcCoinsModel.find(filter, {}, { sort: sortOptions })
-        .limit(limit)
-        .skip((offset - 1) * limit),
-      CmcCoinsModel.countDocuments(filter),
-    ]);
-
-    result.data = {
-      count,
-      coins,
-      pages: Math.ceil(count / limit),
-    };
+    await Promise.all([CoinsTrending.deleteMany({})]);
   } catch (ex) {
     result.ex = ex;
   } finally {
     return result;
   }
 };
+exports.deleteNewTokens = async (result = {}) => {
+  try {
+    const deletionResult = await CmcCoinsNew.deleteMany({});
+    console.log(deletionResult?.length ?? 0, "deletionResult ::::::::"); // safely logs length or 0
+    result.data = deletionResult;
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+// exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
+//   try {
+//     const { limit, offset, orderField, orderDirection, userId } =
+//       getAllCryptoDto;
+//     console.log(userId, "userId");
+//     const filter = {};
+//     const sortOptions = {
+//       ...(orderField && { [orderField]: +orderDirection || 1 }),
+//     };
+
+//     // 1. Fetch coins and total count
+//     const [coins, count] = await Promise.all([
+//       CmcCoinsModel.find(filter, {}, { sort: sortOptions })
+//         .limit(Number(limit))
+//         .skip((Number(offset) - 1) * Number(limit)),
+//       CmcCoinsModel.countDocuments(filter),
+//     ]);
+
+//     let watchlistCoinIds = new Set();
+
+//     // 2. If userId is provided, fetch user’s watchlist
+//     if (userId) {
+//       const watchlist = await Watchlist.find({ userId }).lean();
+//       watchlistCoinIds = new Set(watchlist.map((w) => w.coinId));
+//     }
+
+//     // 3. Attach isWatchlist to each coin
+//     const coinsWithWatchlist = coins.map((coin) => ({
+//       ...coin.toObject(),
+//       isWatchlist: userId ? watchlistCoinIds.has(coin.coinId) : false,
+//     }));
+
+//     // 4. Final response
+//     result.data = {
+//       count,
+//       pages: Math.ceil(count / limit),
+//       coins: coinsWithWatchlist,
+//     };
+//   } catch (ex) {
+//     result.ex = ex;
+//   } finally {
+//     return result;
+//   }
+// };
+
+exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection, userId } =
+      getAllCryptoDto;
+
+    const filter = {};
+    const sortOptions = orderField
+      ? { [orderField]: Number(orderDirection) || 1 }
+      : {};
+
+    // 1. Define the fields you actually want
+    const projection = {
+      coinId: 1,
+      name: 1,
+      symbol: 1,
+      logo: 1,
+      price: 1,
+      market_cap: 1,
+      percent_change_1h: 1,
+      percent_change_24h: 1,
+      percent_change_7d: 1,
+      volume_change_24h: 1,
+      sparkline_7d: 1,
+      percent_change_24h: 1,
+      volume_24h: 1,
+    };
+
+    // 2. Fetch paginated coins + total count
+    const [coins, count] = await Promise.all([
+      CmcCoinsModel.find(filter, projection, { sort: sortOptions })
+        .limit(Number(limit))
+        .skip((Number(offset) - 1) * Number(limit))
+        .lean(),
+      CmcCoinsModel.countDocuments(filter),
+    ]);
+
+    // 3. Get user’s watchlist (if logged in)
+    let watchlistMap = new Map();
+    if (userId) {
+      const watchlist = await Watchlist.find({ userId }).lean();
+      watchlist.forEach((w) => {
+        watchlistMap.set(w.coinId, w.isWatchlist); // true / false
+      });
+    }
+
+    // 4. Attach isWatchlist to each coin
+    const coinsWithWatchlist = coins.map((coin) => ({
+      coinId: coin.coinId,
+      name: coin.name,
+      symbol: coin.symbol,
+      logo: coin.logo,
+      sparkline_7d: coin.sparkline_7d,
+      percent_change_24h: coin.percent_change_24h,
+      price: Number(coin.price || 0),
+      market_cap: Number(coin.market_cap || 0),
+      percent_change_1h: Number(coin.percent_change_1h || 0),
+      percent_change_24h: Number(coin.percent_change_24h || 0),
+      percent_change_7d: Number(coin.percent_change_7d || 0),
+      volume_change_24h: Number(coin.volume_change_24h || 0),
+      volume_24h: Number(coin.volume_24h || 0),
+      isWatchlist: watchlistMap.get(coin.coinId) || false,
+    }));
+
+    // 5. Return final response
+    result.data = {
+      count,
+      pages: Math.ceil(count / limit),
+      coins: coinsWithWatchlist,
+    };
+
+    result.message = "Coins fetched successfully";
+  } catch (ex) {
+    console.error("[getAllCrypto] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection, skipCoinId, userId } =
+      getSkipCoinIdDto;
+
+    // 1. Build filter
+    const filter = {};
+    if (skipCoinId) {
+      filter.coinId = { $ne: skipCoinId.toString() }; // skip that coinId
+    }
+
+    // 2. Sorting
+    const sortOptions = orderField
+      ? { [orderField]: Number(orderDirection) || 1 }
+      : {};
+
+    // 3. Projection (fetch only needed fields)
+    const projection = {
+      name: 1,
+      price: 1,
+      logo: 1,
+      percent_change_1h: 1,
+      percent_change_24h: 1,
+      symbol: 1,
+      coinId: 1,
+      sparkline_7d: 1,
+    };
+
+    // 4. Fetch coins and total count
+    const [coins, count] = await Promise.all([
+      CmcCoinsModel.find(filter, projection, { sort: sortOptions })
+        .limit(Number(limit))
+        .skip((Number(offset) - 1) * Number(limit))
+        .lean(),
+      CmcCoinsModel.countDocuments(filter),
+    ]);
+
+    // 5. Build watchlist map (coinId -> isWatchlist)
+    let watchlistMap = new Map();
+    if (userId) {
+      const watchlist = await Watchlist.find({ userId }).lean();
+      watchlist.forEach((w) => {
+        watchlistMap.set(w.coinId, w.isWatchlist); // store actual boolean
+      });
+    }
+
+    // 6. Attach `isWatchlist` status for each coin
+    const coinsWithWatchlist = coins.map((coin) => ({
+      ...coin,
+      isWatchlist: watchlistMap.get(coin.coinId) || false,
+    }));
+
+    // 7. Return final result
+    result.data = {
+      count,
+      pages: Math.ceil(count / limit),
+      coins: coinsWithWatchlist,
+    };
+
+    result.message = "Coins fetched successfully (excluding skipCoinId)";
+  } catch (ex) {
+    console.error("[getSkipCoinId] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
 exports.getTopGainers = async (getTopGainersDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection } = getTopGainersDto;
@@ -508,6 +818,123 @@ exports.getTopGainers = async (getTopGainersDto, result = {}) => {
     return result;
   }
 };
+exports.getMostVisited = async (getMostVisitedDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getMostVisitedDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsMostVisited.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsMostVisited.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTrending = async (getTrendingDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTrendingDto;
+
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsTrending.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsTrending.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getNew = async (getTrendingDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTrendingDto;
+    console.log(getTrendingDto, "getTrendingDto::::::::");
+    const filter = {};
+
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    const [coins, count] = await Promise.all([
+      CoinsTrending.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsTrending.countDocuments(filter),
+    ]);
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getExploreNew = async (getTrendingDto, result = {}) => {
+  try {
+    const limit = Number(getTrendingDto.limit) || 20;
+    const offset = Number(getTrendingDto.offset) || 1;
+
+    const coins = await CmcCoinsNew.aggregate([
+      {
+        $lookup: {
+          from: "cmccoins", // 👈 same as CmcCoinsModel ka collection name
+          localField: "coinId",
+          foreignField: "coinId",
+          as: "fullData",
+        },
+      },
+      { $skip: (offset - 1) * limit },
+      { $limit: limit },
+    ]);
+
+    const count = await CmcCoinsNew.countDocuments();
+
+    result.data = {
+      count,
+      coins,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    console.error("Error in getExploreNew:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
 exports.getSearch = async (getSearchDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection, search } = getSearchDto;
@@ -580,11 +1007,9 @@ exports.getTopLossers = async (getTopLossersDto, result = {}) => {
 };
 exports.getTopstats = async ({ id }, result = {}) => {
   try {
-    console.log({ id });
     const question = await CoinsStats.findOne({
       _id: ObjectId(id),
     });
-    console.log(question, "question");
     result.data = question;
     result.success = true;
   } catch (ex) {
@@ -592,6 +1017,145 @@ exports.getTopstats = async ({ id }, result = {}) => {
     result.error = true;
     result.ex = ex.message;
     result.success = false;
+  } finally {
+    return result;
+  }
+};
+exports.getPopularConversions = async (getDto = {}, result = {}) => {
+  try {
+    // Define 10 popular conversion pairs
+    const popularPairs = [
+      { tokenA: "BTC", tokenB: "ETH" },
+      { tokenA: "BTC", tokenB: "BNB" },
+      { tokenA: "BTC", tokenB: "SOL" },
+      { tokenA: "BTC", tokenB: "XRP" },
+      { tokenA: "ETH", tokenB: "SOL" },
+      { tokenA: "ETH", tokenB: "BNB" },
+      { tokenA: "ETH", tokenB: "ADA" },
+      { tokenA: "BNB", tokenB: "SOL" },
+      { tokenA: "SOL", tokenB: "XRP" },
+      { tokenA: "BTC", tokenB: "ADA" },
+    ];
+
+    // Fetch all involved coins in one go for efficiency
+    const allSymbols = [
+      ...new Set(popularPairs.flatMap((p) => [p.tokenA, p.tokenB])),
+    ];
+
+    const coins = await CmcCoinsModel.find({
+      symbol: { $in: allSymbols },
+    }).lean();
+
+    // Create quick lookup
+    const coinMap = {};
+    for (const coin of coins) {
+      coinMap[coin.symbol.toUpperCase()] = coin;
+    }
+
+    // Format helper
+    const formatCurrency = (num) =>
+      `$${num.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+
+    // Compute conversions
+    const conversions = [];
+
+    for (const { tokenA, tokenB } of popularPairs) {
+      const coinA = coinMap[tokenA.toUpperCase()];
+      const coinB = coinMap[tokenB.toUpperCase()];
+
+      if (!coinA || !coinB) continue;
+
+      const priceA = parseFloat(coinA.price) || 0;
+      const marketCapA = parseFloat(coinA.market_cap) || 0;
+      const marketCapB = parseFloat(coinB.market_cap) || 0;
+
+      if (!priceA || !marketCapA || !marketCapB) continue;
+
+      const calculatedPrice = (marketCapB / marketCapA) * priceA;
+      const multiplier = marketCapB / marketCapA;
+
+      conversions.push({
+        pair: `${tokenA}/${tokenB}`,
+        from: {
+          name: coinA.name,
+          symbol: coinA.symbol,
+          price: priceA,
+          marketCap: marketCapA,
+          logo: coinA.logo,
+        },
+        to: {
+          name: coinB.name,
+          symbol: coinB.symbol,
+          price: parseFloat(coinB.price),
+          marketCap: marketCapB,
+          logo: coinB.logo,
+        },
+        conversion: {
+          calculatedPrice,
+          formatted: `${formatCurrency(calculatedPrice)} (${multiplier.toFixed(
+            2
+          )}x)`,
+          multiplier: Number(multiplier.toFixed(4)),
+        },
+      });
+    }
+
+    result.data = conversions;
+    result.message = "Top 10 popular conversions fetched successfully.";
+  } catch (ex) {
+    console.error("[getPopularConversions] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getCompare = async (getCompareDto, result = {}) => {
+  try {
+    const { coinIds = [] } = getCompareDto;
+
+    if (!coinIds.length) {
+      result.error = true;
+      result.message = "No coinIds provided for comparison.";
+      return result;
+    }
+
+    // Find all coins by coinId
+    const coins = await CmcCoinsModel.find({
+      coinId: { $in: coinIds.map(String) },
+    });
+
+    if (!coins.length) {
+      result.error = true;
+      result.message = "No matching coins found.";
+      return result;
+    }
+
+    // Format data
+    const data = coins.map((coin) => ({
+      coinId: coin.coinId,
+      name: coin.name,
+      symbol: coin.symbol,
+      logo: coin.logo,
+      price: Number(coin.price || 0),
+      priceChange24h: Number(coin.percent_change_24h || 0),
+      marketCap: Number(coin.market_cap || 0),
+      marketCapChange24h: Number(coin.market_cap_change_24h || 0),
+      volume24h: Number(coin.volume_24h || 0),
+      circulatingSupply: Number(coin.circulating_supply || 0),
+      rank: Number(coin.cmcRank || 0),
+      activeSince: coin.createdAt,
+    }));
+
+    result.data = {
+      total: data.length,
+      coins: data,
+    };
+  } catch (ex) {
+    console.error("[getCompare] Error:", ex);
+    result.ex = ex;
   } finally {
     return result;
   }

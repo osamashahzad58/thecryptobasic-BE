@@ -1,11 +1,16 @@
 let User = require("./users.model");
 let Watchlist = require("../watchlist/watchlist.model");
 const mongoose = require("mongoose");
+const { JWT_TOKEN_TYPES } = require("../../helpers/constants");
+const redisClient = require("../../helpers/redis");
+
 const eventEmitter = require("../common/events/events.event-emitter");
 const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 const emailUtils = require("../common/email/email.util");
 const { KYC_STATUS } = require("./constants/users.constants");
+const bcrypt = require("bcrypt");
+const JWT = require("../common/auth/jwt");
 
 const otpGenerator = require("otp-generator");
 const EMAIL_VERIFICATION_EVENTS = require("./constants/users.constants");
@@ -56,18 +61,41 @@ exports.profile = async (profileDto, result = {}) => {
 // const mongoose = require("mongoose");
 exports.createUser = async (createUserDto, result = {}) => {
   try {
-    createUserDto = {
+    const userPayload = {
       ...createUserDto,
       role: "user",
     };
 
-    const savedUser = await User.create(createUserDto);
+    const savedUser = await User.create(userPayload);
 
-    const { password, ...safeUserData } = savedUser;
+    const email = userPayload.email;
 
-    result.data = safeUserData;
+    // Generate OTP
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
+
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000);
+    savedUser.otp = otp;
+    savedUser.otpExpiresTime = expiryTime;
+    await savedUser.save();
+
+    // Send OTP email
+    eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.SEND_OTP, {
+      receiverEmail: email,
+      codeVerify: otp,
+    });
+
+    // Normalize _id → id
+    const { password, otp: _otp, _id, ...rest } = savedUser.toObject();
+    result.data = { id: _id.toString(), ...rest };
   } catch (ex) {
     result.ex = ex;
+    result.data = null; // make sure it exists
   } finally {
     return result;
   }
@@ -75,20 +103,12 @@ exports.createUser = async (createUserDto, result = {}) => {
 
 exports.sendOtp = async (sendOtpDto, result = {}) => {
   try {
-    const { email, id, walletAddress } = sendOtpDto;
-    const user = await User.findOne({ id, walletAddress, role: "user" });
+    const { email, rememberMe = false } = sendOtpDto; // added rememberMe here
+    const user = await User.findOne({ email, role: "user" });
+
     if (!user) {
       result.userNotFound = true;
       return;
-    }
-
-    // if (user && !user.email) {
-    //   user.email = email;
-    //   await user.save();
-    // }
-    if (email && user.email !== email) {
-      user.email = email;
-      await user.save();
     }
 
     if (user?.isEmailVerified) {
@@ -96,33 +116,63 @@ exports.sendOtp = async (sendOtpDto, result = {}) => {
       return;
     }
 
+    // Generate OTP
     const otp = otpGenerator.generate(6, {
       digits: true,
       alphabets: false,
       upperCaseAlphabets: false,
-      upperCase: false,
       lowerCaseAlphabets: false,
-      lowerCase: false,
       specialChars: false,
     });
 
-    const currentDate = new Date();
-    currentDate.setMinutes(currentDate.getMinutes() + 10);
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     user.otp = otp;
-    user.otpExpiresTime = currentDate;
+    user.otpExpiresTime = expiryTime;
     await user.save();
 
-    // eventEmitter.emit(USERS_EVENTS.SEND_OTP, {
-    //   receiverEmail: user?.email,
-    //   otp: otp,
-    // });
+    // Generate tokens
+    const [accessToken, refreshToken] = await Promise.all([
+      JWT.signToken(
+        {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+        },
+        JWT_TOKEN_TYPES.ACCESS_TOKEN
+      ),
+      JWT.signToken(
+        {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+        },
+        JWT_TOKEN_TYPES.REFRESH_TOKEN
+      ),
+    ]);
+
+    // Store refresh token in Redis with proper TTL
+    const ttl = rememberMe
+      ? configs.jwt.refreshToken.redisRemeberMeTTL
+      : configs.jwt.refreshToken.redisTTL;
+
+    await redisClient.set(user._id.toString(), refreshToken, { EX: ttl });
+
+    // Safe response
+    result.data = {
+      name: user.userName || user.firstName || null,
+      otpExpiresTime: user.otpExpiresTime,
+      otp: user.otp,
+      accessToken,
+      refreshToken,
+    };
+
+    // Trigger email event
     eventEmitter.emit(EMAIL_VERIFICATION_EVENTS.SEND_OTP, {
       receiverEmail: email,
       codeVerify: otp,
     });
   } catch (ex) {
     if (ex.code === 11000) {
-      // Mongoose duplicate key error
       const keyName = Object.keys(ex.keyPattern)[0];
       result.conflictMessage = `${keyName} already exists`;
       result.conflictField = keyName;
@@ -137,27 +187,64 @@ exports.sendOtp = async (sendOtpDto, result = {}) => {
 
 exports.verifyOtp = async (verifyOtpDto, result = {}) => {
   try {
-    const { id, walletAddress, otp } = verifyOtpDto;
-    const user = await User.findOne({ id, walletAddress, role: "user" });
+    const { id, otp } = verifyOtpDto;
+
+    const user = await User.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      role: "user",
+    });
     if (!user) {
       result.userNotFound = true;
       return;
     }
 
-    if (user?.otp !== otp) {
-      result.optCodeIncorrect = true;
-      return;
+    if (String(user.otp) !== String(otp)) {
+      result.otpCodeIncorrect = true;
+      return result;
     }
 
     if (user?.otpExpiresTime < new Date()) {
       result.otpExpired = true;
       return;
     }
-    await User.findOneAndUpdate(
-      { _id: new mongoose.Types.ObjectId(id), walletAddress },
+
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: user._id },
       {
         $set: { isEmailVerified: true },
         $unset: { otp: "", otpExpiresTime: "" },
+      },
+      { new: true }
+    );
+
+    result.data = {
+      id: updatedUser._id,
+      email: updatedUser.email,
+      isEmailVerified: updatedUser.isEmailVerified,
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+exports.restPassword = async (restPasswordDto, result = {}) => {
+  try {
+    const { email, password } = restPasswordDto;
+
+    const user = await User.findOne({ email, role: "user" });
+    if (!user) {
+      result.userNotFound = true;
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await User.findOneAndUpdate(
+      { email: email },
+      {
+        $set: { isEmailVerified: true, password: hashedPassword },
       },
       { new: true }
     );
@@ -237,6 +324,7 @@ exports.getProfile = async ({ id }, result = {}) => {
 exports.findUserByEmailOrUsername = async ({ email }, result = {}) => {
   try {
     result.data = await User.findOne({ email });
+    console.log(result.data, "result.data 294");
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -321,6 +409,15 @@ exports.findByWalletAddressForUpdate = async (
     }
   } catch (ex) {
     result.error = ex.message;
+  } finally {
+    return result;
+  }
+};
+exports.findUserByEmail = async (email, result = {}) => {
+  try {
+    result.data = await User.findOne({ email, role: "user" });
+  } catch (ex) {
+    result.ex = ex;
   } finally {
     return result;
   }
