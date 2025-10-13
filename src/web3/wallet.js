@@ -24,8 +24,8 @@ const transferTopic = ethers.id("Transfer(address,address,uint256)");
 
 
 const API_KEY = ''; // Replace with your actual Etherscan API key
-const WalletAddress = '0x294d0487fdf7acecf342ae70AFc5549A6E90f3e0';
-const chainid = 1; // Ethereum Mainnet
+const WalletAddress = '0x294d0487fdf7acecf342ae70AFc5549A6E90f3e0'; // pass wallet address here
+const chainid = 1; // Ethereum Mainnet, change chain id acordingly 
 const API_URL = `https://api.etherscan.io/v2/api?chainid=${chainid}&module=account&action=txlist&address=${WalletAddress}&startblock=0&endblock=latest&page=1&offset=1000&sort=asc&apikey=${API_KEY}`;
 
 async function fetchTransactions() {
