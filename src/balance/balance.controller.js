@@ -8,6 +8,7 @@ exports.create = async function (req, res, next) {
       ...req.body,
       userId: req.user?.id,
     };
+    console.log(createDto, "createDto controller");
 
     const result = await balanceService.create(createDto);
 
@@ -87,6 +88,25 @@ exports.getCombinePortfolio = async function (req, res, next) {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "balance by User successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getByBalance = async (req, res, next) => {
+  try {
+    const getByBalanceDto = {
+      id: req.params.id,
+    };
+
+    const result = await balanceService.getByBalance(getByBalanceDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "For single detail successfully",
       data: result.data,
     });
   } catch (ex) {

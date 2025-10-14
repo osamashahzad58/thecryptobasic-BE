@@ -12,6 +12,17 @@ const tokenSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  coinId: {
+    type: String,
+    required: true,
+    trim: true,
+    index: true,
+  },
+  icon: {
+    type: String,
+    required: true,
+    trim: true,
+  },
   symbol: {
     type: String,
     required: true,
@@ -28,6 +39,26 @@ const tokenSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  percent_change_1h: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  percent_change_24h: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  profitLossUSD: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  percent_change_7d: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   totalValueUSD: {
     type: Number,
     default: 0,
@@ -40,6 +71,12 @@ const balanceSchema = new mongoose.Schema(
     isMe: {
       type: Boolean,
       default: false,
+    },
+    portfolioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "portfolios",
+      required: true,
+      index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
