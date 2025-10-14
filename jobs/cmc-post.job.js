@@ -4,6 +4,9 @@ const fs = require("fs");
 const sharp = require("sharp");
 const { createCanvas, registerFont } = require("canvas");
 const path = require("path");
+registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
+  family: "NotoSans",
+});
 
 // Configuration
 const CONFIG = {
