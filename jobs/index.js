@@ -6,7 +6,7 @@ const fetchCMCTrending = require("./cmc-Trending.job");
 const fetchCMCNewTokens = require("./cmc-new.job");
 const fetchCMCPrice = require("./cmc-price.job");
 const { initializeJob } = require("./coins-price-emitters");
-// require("../jobs/cmc-post.job");
+require("../jobs/cmc-post.job");
 
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
