@@ -615,21 +615,18 @@ function fallbackPrice(symbol) {
 // ---------------------------
 async function findOrCreatePortfolio(walletAddress, userId) {
   const lower = walletAddress.toLowerCase();
-  let portfolio = await Portfolio.findOne({
+  // let portfolio = await Portfolio.create({
+  //   walletAddress: lower,
+  //   userId: new mongoose.Types.ObjectId(userId),
+  // });
+  let portfolio = await Portfolio.create({
     walletAddress: lower,
+    isBlockchain: true,
     userId: new mongoose.Types.ObjectId(userId),
+    name: `Portfolio-${lower.slice(0, 6)}...`,
   });
-  if (!portfolio) {
-    portfolio = await Portfolio.create({
-      walletAddress: lower,
-      isBlockchain: true,
-      userId: new mongoose.Types.ObjectId(userId),
-      name: `Portfolio-${lower.slice(0, 6)}...`,
-    });
-    console.log("📁 Created new portfolio:", portfolio._id);
-  } else {
-    console.log("📁 Using existing portfolio:", portfolio._id);
-  }
+  console.log("📁 Created new portfolio:", portfolio._id);
+
   return portfolio;
 }
 
@@ -932,6 +929,15 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
      * =============================== */
     const balances = await Balance.find({ userId: userObjectId });
 
+    /** ==============================
+     *  2. FETCH PORTFOLIOS
+     * =============================== */
+    const portfolios = await Portfolio.find({ userId: userObjectId });
+
+    const portfolioAddresses = portfolios.map((p) =>
+      (p.walletAddress || "").toLowerCase()
+    );
+
     const walletData = balances.map((wallet) => {
       const totalValueUSD = wallet.tokens.reduce(
         (sum, token) => sum + (token.totalValueUSD || 0),
@@ -950,9 +956,23 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       };
     });
 
-    // Split based on isMe flag
-    const myWallets = walletData.filter((w) => w.isMe);
-    const otherWallets = walletData.filter((w) => !w.isMe);
+    // ✅ Classify wallets properly
+    const myWallets = walletData.filter((w) => {
+      const address = (w.walletAddress || "").toLowerCase();
+      return (
+        w.isMe === true ||
+        w.isMe === "true" ||
+        portfolioAddresses.includes(address)
+      );
+    });
+
+    const otherWallets = walletData.filter((w) => {
+      const address = (w.walletAddress || "").toLowerCase();
+      return (
+        !portfolioAddresses.includes(address) &&
+        (w.isMe === false || w.isMe === "false")
+      );
+    });
 
     const myWalletTotal = myWallets.reduce(
       (sum, w) => sum + w.totalValueUSD,
@@ -964,10 +984,8 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     );
 
     /** ==============================
-     *  2. FETCH PORTFOLIOS + TRANSACTIONS
+     *  3. FETCH TRANSACTIONS + COINS
      * =============================== */
-    const portfolios = await Portfolio.find({ userId: userObjectId });
-
     let portfolioData = [];
 
     if (portfolios.length) {
@@ -977,11 +995,15 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       });
 
       const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
-      const coins = await Coin.find({ coinId: { $in: coinIds } });
+
+      const coins = await Coin.find({
+        $or: [{ coinId: { $in: coinIds } }, { symbol: { $in: coinIds } }],
+      });
 
       const coinMap = {};
       for (const coin of coins) {
         coinMap[coin.coinId] = coin;
+        if (coin.symbol) coinMap[coin.symbol] = coin;
       }
 
       const transactionsByPortfolio = {};
@@ -992,7 +1014,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         if (!transactionsByPortfolio[pid]) transactionsByPortfolio[pid] = [];
         if (!portfolioHoldings[pid]) portfolioHoldings[pid] = {};
 
-        const coinInfo = coinMap[tx.coinId] || {};
+        const coinInfo = coinMap[tx.coinId] || coinMap[tx.symbol] || {};
         const coinId = tx.coinId;
 
         transactionsByPortfolio[pid].push({
@@ -1030,7 +1052,10 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         let totalValue = 0;
 
         for (const [coinId, qty] of Object.entries(holdings)) {
-          const coin = coinMap[coinId];
+          const coin =
+            coinMap[coinId] ||
+            coinMap[coinId.toUpperCase()] ||
+            coinMap[coinId.toLowerCase()];
           if (coin && coin.price && qty > 0) {
             totalValue += qty * coin.price;
           }
@@ -1050,7 +1075,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     );
 
     /** ==============================
-     *  3. FINAL RESULT
+     *  4. FINAL RESULT
      * =============================== */
     result.data = {
       totalMyWallets: myWallets.length,
@@ -1073,6 +1098,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     return result;
   }
 };
+
 exports.getByBalance = async ({ id }, result = {}) => {
   try {
     const data = await Balance.findById(id).lean();
