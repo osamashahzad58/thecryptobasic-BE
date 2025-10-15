@@ -339,6 +339,31 @@ class DexScreenerWPBot {
 <p class="lead-intro"><strong>${name} (${symbol})</strong> is a newly listed cryptocurrency token on the <strong>${chain.toUpperCase()} blockchain</strong> that's gaining significant attention in the DeFi space. This comprehensive analysis provides real-time price data, advanced charting, and essential trading insights for informed decision-making.</p>
 <!-- /wp:paragraph -->
 
+<!-- wp:heading -->
+<h2>📈 Live ${symbol} Price Chart & Technical Analysis</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Track ${symbol} price movements in real-time with our advanced TradingView chart. Monitor key support/resistance levels, trading volume, and technical indicators for better trading decisions.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:html -->
+<div style="width:100%;height:520px;border-radius:12px;overflow:hidden;">
+  <iframe 
+        src="${pairData.url}?embed=1"
+        width="100%"
+        height="800"
+        scrolling="no" allowtransparency="true"
+        class="dexscreener-embed"
+        frameborder="0"
+        allow="clipboard-read; clipboard-write"
+    ></iframe>
+</div>
+<!-- /wp:html -->
+
+<br/>
+<br/>
+
 ${
   pairData.info && pairData.info.imageUrl
     ? `
@@ -354,7 +379,7 @@ ${
 }
 
 <!-- wp:heading -->
-<h2>📊 Live ${symbol} Price & Market Dashboard</h2>
+<h2>${symbol} Price & Market Dashboard</h2>
 <!-- /wp:heading -->
 
 <!-- wp:table {"className":"market-data-table"} -->
@@ -426,28 +451,6 @@ ${
 </table>
 </figure>
 <!-- /wp:table -->
-
-<!-- wp:heading -->
-<h2>📈 Live ${symbol} Price Chart & Technical Analysis</h2>
-<!-- /wp:heading -->
-
-<!-- wp:paragraph -->
-<p>Track ${symbol} price movements in real-time with our advanced TradingView chart. Monitor key support/resistance levels, trading volume, and technical indicators for better trading decisions.</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:html -->
-<div style="width:100%;height:520px;border-radius:12px;overflow:hidden;">
-  <iframe 
-        src="${pairData.url}?embed=1"
-        width="100%"
-        height="800"
-        scrolling="no" allowtransparency="true"
-        class="dexscreener-embed"
-        frameborder="0"
-        allow="clipboard-read; clipboard-write"
-    ></iframe>
-</div>
-<!-- /wp:html -->
 
 <br/>
 <br/>
