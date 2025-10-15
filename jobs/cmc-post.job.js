@@ -4,8 +4,14 @@ const fs = require("fs");
 const sharp = require("sharp");
 const { createCanvas, registerFont } = require("canvas");
 const path = require("path");
+// English font
 registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
   family: "NotoSans",
+});
+
+// Chinese font
+registerFont("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", {
+  family: "NotoSansCJK",
 });
 
 // Configuration
@@ -807,20 +813,22 @@ ${
     ctx.fillStyle = "#0d1117";
     ctx.fillRect(0, 0, width, height);
 
+    // Detect if text contains Chinese (or other CJK characters)
+    const isCJK = /[\u4e00-\u9fff]/.test(text);
+
+    // Choose font family
+    const fontFamily = isCJK ? "NotoSansCJK" : "NotoSans";
+
     // Text styling
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Try different font sizes to fit text
+    // Try different font sizes to fit text width
     let fontSize = 64;
-    let fontFamily = "sans-serif";
-
-    // Use a font that supports Unicode (system dependent)
     ctx.font = `bold ${fontSize}px "${fontFamily}"`;
 
-    // Measure text and adjust if too wide
-    const metrics = ctx.measureText(text);
+    let metrics = ctx.measureText(text);
     if (metrics.width > width - 100) {
       fontSize = Math.floor(64 * ((width - 100) / metrics.width));
       ctx.font = `bold ${fontSize}px "${fontFamily}"`;
