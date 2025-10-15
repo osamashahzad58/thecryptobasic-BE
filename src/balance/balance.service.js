@@ -772,7 +772,7 @@ exports.create = async (createDto, result = {}) => {
         coinId: tokenMeta.symbol, // Use the resolved symbol
         name: tokenMeta.name,
         symbol: tokenMeta.symbol,
-        icon: address,
+        icon: tokenMeta.icon,
         type: "transfer",
         transferDirection: direction,
         transactionTime: new Date(
@@ -783,7 +783,8 @@ exports.create = async (createDto, result = {}) => {
         pricePerCoin: tokenMeta.priceUSD, // Use the resolved price
         totalSpent: 0,
         totalReceived: 0,
-        note: tx.from_address,
+        note: address,
+        walletAddress: address,
         portfolioId: portfolioId,
         chainName: chainName,
       };

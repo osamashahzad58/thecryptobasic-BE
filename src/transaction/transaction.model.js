@@ -67,6 +67,10 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    walletAddress: {
+      type: String,
+      trim: true,
+    },
     icon: {
       type: String,
       trim: true,
