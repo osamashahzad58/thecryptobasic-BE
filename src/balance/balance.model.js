@@ -23,11 +23,7 @@ const tokenSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  chainName: {
-    type: String,
-    required: true,
-    trim: true,
-  },
+
   symbol: {
     type: String,
     required: true,
@@ -74,6 +70,10 @@ const tokenSchema = new mongoose.Schema({
 const balanceSchema = new mongoose.Schema(
   {
     isMe: {
+      type: Boolean,
+      default: false,
+    },
+    isBlockchain: {
       type: Boolean,
       default: false,
     },

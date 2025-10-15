@@ -726,11 +726,8 @@ exports.create = async (createDto, result = {}) => {
       isBlockchain: true,
     };
 
-    const walletDoc = await Balance.findOneAndUpdate(
-      { walletAddress: walletAddress.toLowerCase() },
-      { $set: updateData },
-      { upsert: true, new: true }
-    );
+    const walletDoc = await Balance.create(updateData);
+
     console.log("💾 [Balance] Wallet saved:", walletDoc.walletAddress);
 
     // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
