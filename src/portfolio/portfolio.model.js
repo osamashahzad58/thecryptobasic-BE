@@ -8,6 +8,10 @@ const portfolioSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    isMe: {
+      type: Boolean,
+      default: false,
+    },
     url: {
       type: String,
       default:
