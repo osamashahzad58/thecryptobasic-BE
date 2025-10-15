@@ -57,6 +57,21 @@ exports.getUserWatchlist = async function (req, res, next) {
     next(ex);
   }
 };
+exports.getCheckPortfolio = async function (req, res, next) {
+  try {
+    const { id: userId } = req.user;
+    const result = await usersService.getCheckPortfolio({ userId });
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User Check Portfolio data",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 
 exports.sendOtp = async (req, res, next) => {
   try {

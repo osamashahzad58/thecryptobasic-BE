@@ -802,6 +802,7 @@ exports.create = async (createDto, result = {}) => {
         totalReceived: 0,
         note: hash,
         portfolioId: new mongoose.Types.ObjectId(portfolio._id),
+        chain: chainName,
       });
     }
 
