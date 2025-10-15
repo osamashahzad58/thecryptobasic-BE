@@ -19,7 +19,6 @@ const portfolioSchema = new mongoose.Schema(
     },
     chainName: {
       type: String,
-      required: true,
       trim: true,
     },
     name: {
