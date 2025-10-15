@@ -5,28 +5,26 @@ const sharp = require("sharp");
 const { createCanvas, registerFont } = require("canvas");
 const path = require("path");
 
-// English font (should exist)
+// English font
 registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
   family: "NotoSans",
 });
 
-// Try multiple paths for the Chinese font
+// Try common CJK font locations
 const possibleCJKPaths = [
   "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-  "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
+  "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/truetype/noto/NotoSansSC-Regular.otf",
 ];
 
-let cjkFontPath = possibleCJKPaths.find((p) => fs.existsSync(p));
+const cjkFontPath = possibleCJKPaths.find((p) => fs.existsSync(p));
 
 if (cjkFontPath) {
-  console.log("✅ Loaded Chinese font:", cjkFontPath);
+  console.log("✅ Loaded Chinese font from:", cjkFontPath);
   registerFont(cjkFontPath, { family: "NotoSansCJK" });
 } else {
-  console.warn(
-    "⚠️ Chinese font not found. Falling back to NotoSans (may not render all characters)."
-  );
+  console.warn("⚠️ No CJK font found, using fallback font");
   registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
     family: "NotoSansCJK",
   });
