@@ -1,6 +1,7 @@
 let Portfolio = require("./portfolio.model");
 let Transaction = require("../transaction/transaction.model");
 let Coin = require("../cmc-coins/models/cmc-coins.model");
+let Balance = require("../balance/balance.model");
 const mongoose = require("mongoose");
 const { symbol } = require("joi");
 
@@ -168,8 +169,6 @@ exports.update = async (updateDto, result = {}) => {
 exports.getByPortfolioId = async (getDto, result = {}) => {
   try {
     const { portfolioId } = getDto;
-    console.log(portfolioId, "portfolioId");
-
     if (!portfolioId) {
       result.ex = new Error("portfolioId is required");
       return result;
@@ -181,74 +180,114 @@ exports.getByPortfolioId = async (getDto, result = {}) => {
       result.notFound = true;
       return result;
     }
-    console.log(portfolio, "portfolio");
 
-    // 2. Find all transactions for this portfolio
+    // 2. Find all transactions
     const transactions = await Transaction.find({
       portfolioId: new mongoose.Types.ObjectId(portfolioId),
     });
-    console.log(transactions, "transactions");
-    // 3. Extract unique coinIds
-    const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
-    const coins = await Coin.find({ coinId: { $in: coinIds } });
 
-    // Create a quick lookup for coins
-    const coinMap = {};
-    for (const coin of coins) {
-      coinMap[coin.coinId] = coin;
+    if (!transactions.length) {
+      result.data = {
+        ...portfolio.toObject(),
+        totalValue: 0,
+        transactions: [],
+      };
+      result.message = "No transactions found for this portfolio";
+      return result;
     }
 
-    // 4. Compute holdings and attach coin info
+    // 3. Extract coinIds & symbols
+    const coinIds = [
+      ...new Set(transactions.map((tx) => String(tx.coinId).trim())),
+    ];
+    const symbols = [
+      ...new Set(
+        transactions.map((tx) => String(tx.symbol).trim().toUpperCase())
+      ),
+    ];
+
+    // 4. Fetch coins by coinId
+    let coins = await Coin.find({ coinId: { $in: coinIds } });
+
+    // 5. Find missing ones by symbol
+    const foundIds = coins.map((c) => String(c.coinId));
+    const missing = coinIds.filter((id) => !foundIds.includes(id));
+
+    if (missing.length > 0) {
+      const symbolMatches = await Coin.find({
+        symbol: { $in: symbols.map((s) => new RegExp(`^${s}$`, "i")) },
+      });
+      coins = [...coins, ...symbolMatches];
+    }
+
+    // 6. Create lookup maps for both coinId and symbol
+    const coinMap = {};
+    for (const coin of coins) {
+      if (coin.coinId) coinMap[String(coin.coinId).toUpperCase()] = coin;
+      if (coin.symbol) coinMap[String(coin.symbol).toUpperCase()] = coin;
+    }
+
+    // 7. Process transactions
     const holdings = {};
     const enrichedTransactions = [];
 
     for (const tx of transactions) {
-      const coinInfo = coinMap[tx.coinId] || {};
-      const coinId = tx.coinId;
+      const lookupKey1 = String(tx.coinId).toUpperCase();
+      const lookupKey2 = String(tx.symbol).toUpperCase();
 
-      // Attach coin details to each transaction
-      enrichedTransactions.push({
+      // Try finding the coin using both keys
+      const coinInfo = coinMap[lookupKey1] || coinMap[lookupKey2];
+
+      // If no match, skip coinInfo entirely (don't add null data)
+      const txObj = {
         ...tx.toObject(),
-        coinInfo: {
-          coinId: coinInfo.coinId || tx.coinId,
-          logo: coinInfo.logo || null,
-          price: coinInfo.price || 0,
-          name: coinInfo.name || tx.name,
-          symbol: coinInfo.symbol || tx.name,
-          market_cap: coinInfo.market_cap || 0,
-          percent_change_7d: coinInfo.percent_change_7d || 0,
-          percent_change_24h: coinInfo.percent_change_24h || 0,
-          percent_change_1h: coinInfo.percent_change_1h || 0,
-          volume_change_24h: coinInfo.volume_change_24h || 0,
-        },
-      });
+        ...(coinInfo
+          ? {
+              coinInfo: {
+                coinId: coinInfo.coinId,
+                logo: coinInfo.logo || null,
+                price: Number(coinInfo.price) || 0,
+                name: coinInfo.name || tx.name,
+                symbol: coinInfo.symbol || tx.symbol,
+                market_cap: Number(coinInfo.market_cap) || 0,
+                percent_change_7d: Number(coinInfo.percent_change_7d) || 0,
+                percent_change_24h: Number(coinInfo.percent_change_24h) || 0,
+                percent_change_1h: Number(coinInfo.percent_change_1h) || 0,
+                volume_change_24h: Number(coinInfo.volume_change_24h) || 0,
+              },
+            }
+          : {}),
+      };
+
+      enrichedTransactions.push(txObj);
 
       // Update holdings
-      const currentQty = holdings[coinId] || 0;
+      const key = coinInfo?.coinId || tx.coinId;
+      const currentQty = holdings[key] || 0;
 
-      if (tx.type === "buy") {
-        holdings[coinId] = currentQty + tx.quantity;
-      } else if (tx.type === "sell") {
-        holdings[coinId] = currentQty - tx.quantity;
-      } else if (tx.type === "transfer") {
-        if (tx.transferDirection === "in") {
-          holdings[coinId] = currentQty + tx.quantity;
-        } else if (tx.transferDirection === "out") {
-          holdings[coinId] = currentQty - tx.quantity;
-        }
+      if (
+        tx.type === "buy" ||
+        (tx.type === "transfer" && tx.transferDirection === "in")
+      ) {
+        holdings[key] = currentQty + tx.quantity;
+      } else if (
+        tx.type === "sell" ||
+        (tx.type === "transfer" && tx.transferDirection === "out")
+      ) {
+        holdings[key] = currentQty - tx.quantity;
       }
     }
 
-    // 5. Calculate total portfolio value
+    // 8. Calculate total portfolio value
     let totalValue = 0;
     for (const [coinId, qty] of Object.entries(holdings)) {
-      const coin = coinMap[coinId];
+      const coin = coinMap[coinId.toUpperCase()];
       if (coin && coin.price && qty > 0) {
-        totalValue += qty * coin.price;
+        totalValue += qty * Number(coin.price);
       }
     }
 
-    // 6. Prepare final response
+    // 9. Final response
     result.data = {
       ...portfolio.toObject(),
       totalValue,
@@ -262,6 +301,133 @@ exports.getByPortfolioId = async (getDto, result = {}) => {
     return result;
   }
 };
+
+// exports.getByPortfolioId = async (getDto, result = {}) => {
+//   try {
+//     const { portfolioId } = getDto;
+// console
+//     if (!portfolioId) {
+//       result.ex = new Error("portfolioId is required");
+//       return result;
+//     }
+
+//     // 1. Find the portfolio
+//     const portfolio = await Portfolio.findById(portfolioId);
+//     if (!portfolio) {
+//       result.notFound = true;
+//       return result;
+//     }
+
+//     // 2. Find all transactions for this portfolio
+//     const transactions = await Transaction.find({
+//       portfolioId: new mongoose.Types.ObjectId(portfolioId),
+//     });
+
+//     // 3. Extract unique coinIds
+//     const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
+
+//     let coinMap = {};
+
+//     // 4. Choose data source based on portfolio type
+//     if (portfolio.isBlockchain) {
+//       // Use Balance model (on-chain wallet data)
+//       const balances = await Balance.findOne({
+//         userId: portfolio.userId,
+//         portfolioId: portfolio._id,
+//       });
+//       console.log(balances, "balances");
+//       // Flatten all tokens from all wallets for this user
+//       const allTokens = balances.flatMap((b) => b.tokens);
+
+//       // Build lookup map similar to Coin collection
+//       for (const token of allTokens) {
+//         if (!coinMap[token.coinId]) {
+//           coinMap[token.coinId] = {
+//             coinId: token.coinId,
+//             logo: token.icon || null,
+//             price: token.priceUSD || 0,
+//             name: token.name || "",
+//             symbol: token.symbol || "",
+//             market_cap: token.market_cap || 0, // may not exist, keep default
+//             percent_change_7d: token.percent_change_7d || 0,
+//             percent_change_24h: token.percent_change_24h || 0,
+//             percent_change_1h: token.percent_change_1h || 0,
+//             volume_change_24h: 0, // not in Balance schema
+//           };
+//         }
+//       }
+//     } else {
+//       // Default case: use CMC Coin table
+//       const coins = await Coin.find({ coinId: { $in: coinIds } });
+//       for (const coin of coins) {
+//         coinMap[coin.coinId] = coin;
+//       }
+//     }
+
+//     // 5. Compute holdings and attach coin info
+//     const holdings = {};
+//     const enrichedTransactions = [];
+
+//     for (const tx of transactions) {
+//       const coinInfo = coinMap[tx.coinId] || {};
+//       const coinId = tx.coinId;
+
+//       enrichedTransactions.push({
+//         ...tx.toObject(),
+//         coinInfo: {
+//           coinId: coinInfo.coinId || tx.coinId,
+//           logo: coinInfo.logo || null,
+//           price: coinInfo.price || 0,
+//           name: coinInfo.name || tx.name,
+//           symbol: coinInfo.symbol || tx.name,
+//           market_cap: coinInfo.market_cap || 0,
+//           percent_change_7d: coinInfo.percent_change_7d || 0,
+//           percent_change_24h: coinInfo.percent_change_24h || 0,
+//           percent_change_1h: coinInfo.percent_change_1h || 0,
+//           volume_change_24h: coinInfo.volume_change_24h || 0,
+//         },
+//       });
+
+//       // Update holdings
+//       const currentQty = holdings[coinId] || 0;
+
+//       if (tx.type === "buy") {
+//         holdings[coinId] = currentQty + tx.quantity;
+//       } else if (tx.type === "sell") {
+//         holdings[coinId] = currentQty - tx.quantity;
+//       } else if (tx.type === "transfer") {
+//         if (tx.transferDirection === "in") {
+//           holdings[coinId] = currentQty + tx.quantity;
+//         } else if (tx.transferDirection === "out") {
+//           holdings[coinId] = currentQty - tx.quantity;
+//         }
+//       }
+//     }
+
+//     // 6. Calculate total portfolio value
+//     let totalValue = 0;
+//     for (const [coinId, qty] of Object.entries(holdings)) {
+//       const coin = coinMap[coinId];
+//       if (coin && coin.price && qty > 0) {
+//         totalValue += qty * coin.price;
+//       }
+//     }
+
+//     // 7. Prepare final response
+//     result.data = {
+//       ...portfolio.toObject(),
+//       totalValue,
+//       transactions: enrichedTransactions,
+//     };
+//     result.message = "Portfolio details fetched successfully";
+//   } catch (ex) {
+//     console.error("[Portfolio.getByPortfolioId] Error:", ex);
+//     result.ex = ex;
+//   } finally {
+//     return result;
+//   }
+// };
+
 exports.stats = async (statsDto, result = {}) => {
   try {
     const { _id, timeFilter } = statsDto;

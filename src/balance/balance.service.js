@@ -1,162 +1,832 @@
+// balance.service.js
 require("dotenv").config();
+const fetch = require("node-fetch");
+
+const Portfolio = require("../portfolio/portfolio.model");
+const Balance = require("./balance.model");
+const Transaction = require("../transaction/transaction.model");
+const coins = require("../cmc-coins/models/cmc-coins.model");
+const Coin = require("../cmc-coins/models/cmc-coins.model");
 const mongoose = require("mongoose");
 const { ObjectId } = require("mongodb");
-const API_KEY_MORALIS =
+
+// --- API Keys ---
+const API_KEY_MORALIS = (
   process.env.API_KEY_MORALIS ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImEzOWVhMDU5LWQwNTEtNGNiOS05MTg2LTIxZjBhNDMwNzY1YyIsIm9yZ0lkIjoiNDcwMjM4IiwidXNlcklkIjoiNDgzNzQ2IiwidHlwZUlkIjoiM2RkMzNiNTctZjVlMS00NzE2LWE1NWMtNzAxYzM5NThlODliIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTc1NzE1ODEsImV4cCI6NDkxMzMzMTU4MX0.4pvqmwvn7F4p-mPJt4jQahho771hL0wwQyrDH_ccotk";
-// const API_KEY_MORALIS = process.env.API_KEY_MORALIS;
-// const API_KEY_HELIUS = process.env.HELIUS_API_KEY;
-const API_KEY_HELIUS =
-  process.env.HELIUS_API_KEY || "d3402416-bfa9-481f-a64a-76765ae3a5a2";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImEzOWVhMDU5LWQwNTEtNGNiOS05MTg2LTIxZjBhNDMwNzY1YyIsIm9yZ0lkIjoiNDcwMjM4IiwidXNlcklkIjoiNDgzNzQ2IiwidHlwZUlkIjoiM2RkMzNiNTctZjVlMS00NzE2LWE1NWMtNzAxYzM5NThlODliIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTc1NzE1ODEsImV4cCI6NDkxMzMzMTU4MX0.4pvqmwvn7F4p-mPJt4jQahho771hL0wwQyrDH_ccotk"
+).trim();
+const ETHERSCAN_API_KEY = (
+  process.env.ETHERSCAN_API_KEY || "SCQ7RNBKAFWSB1VRRKA2FM8E2C6MAZFUFZ"
+).trim();
+const BSCSCAN_API_KEY = (process.env.BSCSCAN_API_KEY || "").trim();
+const POLYGONSCAN_API_KEY = (process.env.POLYGONSCAN_API_KEY || "").trim();
+const SNOWTRACE_API_KEY = (process.env.SNOWTRACE_API_KEY || "").trim();
+const ARBISCAN_API_KEY = (process.env.ARBISCAN_API_KEY || "").trim();
 
-let Portfolio = require("../portfolio/portfolio.model");
-let Balance = require("./balance.model");
-let Transaction = require("../transaction/transaction.model");
-let Coin = require("../cmc-coins/models/cmc-coins.model");
+// ---------------------------
+// Utilities / Chain mapping
+// ---------------------------
+function chainHexToName(chain) {
+  if (!chain) return "eth";
+  const c = (chain + "").toLowerCase();
+  if (c.startsWith("0x")) {
+    const map = {
+      "0x1": "eth",
+      "0x38": "bsc",
+      "0x89": "polygon",
+      "0xa86a": "avax", // avalanche
+      "0xa4b1": "arbitrum",
+    };
+    return map[c] || "eth";
+  }
+  return c;
+}
 
-// MAIN function
+function chainNameToEtherscanChainId(chainName) {
+  const name = (chainName || "eth").toLowerCase();
+  const map = {
+    eth: 1,
+    ethereum: 1,
+    bsc: 56,
+    polygon: 137,
+    matic: 137,
+    avax: 43114,
+    avalanche: 43114,
+    arbitrum: 42161,
+    arb: 42161,
+  };
+  return map[name] || 1;
+}
+
+const EXPLORER_CONFIG = {
+  eth: {
+    provider: "etherscan",
+    v2Base: "https://api.etherscan.io/v2/api",
+    v1Base: "https://api.etherscan.io/api",
+    apiKey: ETHERSCAN_API_KEY,
+    chainid: 1,
+  },
+  bsc: {
+    provider: "bscscan",
+    base: "https://api.bscscan.com/api",
+    apiKey: BSCSCAN_API_KEY || ETHERSCAN_API_KEY,
+  },
+  polygon: {
+    provider: "polygonscan",
+    base: "https://api.polygonscan.com/api",
+    apiKey: POLYGONSCAN_API_KEY || ETHERSCAN_API_KEY,
+  },
+  avax: {
+    provider: "snowtrace",
+    base: "https://api.snowtrace.io/api",
+    apiKey: SNOWTRACE_API_KEY || ETHERSCAN_API_KEY,
+    chainid: 43114,
+  },
+  arbitrum: {
+    provider: "arbiscan",
+    base: "https://api.arbiscan.io/api",
+    apiKey: ARBISCAN_API_KEY || ETHERSCAN_API_KEY,
+    chainid: 42161,
+  },
+};
+
+// safe JSON fetch that defends against HTML responses
+async function safeFetchJson(url, opts = {}) {
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  const ct =
+    (res.headers && res.headers.get ? res.headers.get("content-type") : "") ||
+    "";
+  if (!res.ok) {
+    const err = new Error(`${res.status} ${text}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  if (
+    !ct.toLowerCase().includes("application/json") &&
+    !text.trim().startsWith("{") &&
+    !text.trim().startsWith("[")
+  ) {
+    const err = new Error(`Non-JSON response: ${text.slice(0, 300)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    const err = new Error(`Invalid JSON: ${text.slice(0, 300)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+}
+
+// ---------------------------
+// Price helper (Moralis primary, fallback map)
+// ---------------------------
+function fallbackPrice(symbol) {
+  const fallback = {
+    ETH: 2600,
+    BNB: 600,
+    MATIC: 0.8,
+    AVAX: 25,
+    ARB: 0.9,
+    USDT: 1,
+    USDC: 1,
+  };
+  return fallback[(symbol || "").toUpperCase()] || 0;
+}
+
+async function getTokenPriceUSD(chain, tokenAddress, symbol = "ETH") {
+  try {
+    if (!API_KEY_MORALIS) return fallbackPrice(symbol);
+    const chainName = chainHexToName(chain);
+    const address =
+      !tokenAddress || /^eth$/i.test(symbol)
+        ? "native"
+        : tokenAddress.toLowerCase();
+    const url = `https://deep-index.moralis.io/api/v2.2/erc20/${address}/price?chain=${chainName}`;
+    const data = await safeFetchJson(url, {
+      headers: { accept: "application/json", "X-API-Key": API_KEY_MORALIS },
+    }).catch(() => ({}));
+    const usd = data?.usdPrice || data?.usd_price || 0;
+    if (usd && !isNaN(Number(usd))) return Number(usd);
+    return fallbackPrice(symbol);
+  } catch (err) {
+    console.warn("[getTokenPriceUSD] error:", err.message || err);
+    return fallbackPrice(symbol);
+  }
+}
+
+// Helper to fetch token metadata from DB/Dexscreener (used by multiple functions)
+async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
+  // Default values
+  let name = defaultSymbol;
+  let symbol = defaultSymbol;
+  let priceUSD = 0;
+  let percent_change_1h = 0;
+  let percent_change_24h = 0;
+  let percent_change_7d = 0;
+  let icon = "";
+  let coinId = null;
+
+  try {
+    // 1. Try to get more accurate data from your CMC table
+    // NOTE: Using exact match on tokenAddr instead of $regex for speed if possible
+    const coin = await coins.findOne({
+      "contracts.contract": tokenAddr.toLowerCase(),
+    });
+
+    if (coin) {
+      name = coin.name || name;
+      symbol = coin.symbol || symbol;
+      icon = coin.logo || "";
+      coinId = coin.coinId || null;
+      priceUSD = Number(coin.price || priceUSD || 0);
+      percent_change_1h = Number(coin.percent_change_1h || 0);
+      percent_change_24h = Number(coin.percent_change_24h || 0);
+      percent_change_7d = Number(coin.percent_change_7d || 0);
+    } else {
+      // 2. Fallback: Dexscreener API
+      try {
+        const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddr}`;
+        const res = await fetch(dsUrl);
+        const dsData = await res.json();
+
+        if (dsData && Array.isArray(dsData.pairs) && dsData.pairs.length > 0) {
+          const pair = dsData.pairs[0];
+          priceUSD = Number(pair.priceUsd || 0);
+          // Dexscreener gives priceChange.h1, h24. No h7d.
+          percent_change_1h = Number(pair.priceChange?.h1 || 0);
+          percent_change_24h = Number(pair.priceChange?.h24 || 0);
+          icon = pair.info?.imageUrl || "";
+        }
+      } catch (dsErr) {
+        // console.warn(`[Dexscreener] error for ${tokenAddr}:`, dsErr.message);
+      }
+    }
+  } catch (err) {
+    console.warn(`[CMC-Coins] lookup failed for ${tokenAddr}:`, err.message);
+  }
+
+  return {
+    name,
+    symbol,
+    icon,
+    coinId,
+    priceUSD,
+    percent_change_1h,
+    percent_change_24h,
+    percent_change_7d,
+  };
+}
+
+// ---------------------------
+// Moralis token balances (primary)
+// ---------------------------
+async function getWalletTokensMoralis(walletAddress, chain) {
+  try {
+    if (!API_KEY_MORALIS) {
+      console.warn(
+        "[getWalletTokensMoralis] no moralis key provided, skipping"
+      );
+      return [];
+    }
+
+    const chainName = chainHexToName(chain);
+    const url = `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/tokens?chain=${chainName}`;
+
+    console.log("🌐 [MORALIS] Fetching tokens:", url);
+
+    const data = await safeFetchJson(url, {
+      headers: {
+        accept: "application/json",
+        "X-API-Key": API_KEY_MORALIS,
+      },
+    });
+
+    const arr = Array.isArray(data?.result)
+      ? data.result
+      : Array.isArray(data)
+      ? data
+      : [];
+
+    if (!Array.isArray(arr)) {
+      console.warn(
+        "[getWalletTokensMoralis] unexpected response shape:",
+        typeof data,
+        data && Object.keys(data)
+      );
+      return [];
+    }
+
+    // --- PERFORMANCE FIX: Use Promise.all to fetch metadata concurrently ---
+    const tokenPromises = arr.map(async (t) => {
+      if (
+        !t ||
+        !(t.token_address || t.tokenAddress) ||
+        t.balance === undefined ||
+        isNaN(Number(t.balance))
+      ) {
+        return null; // Filter out later
+      }
+
+      const tokenAddr = (t.token_address || t.tokenAddress || "").toLowerCase();
+      const decimals = Number(
+        t.decimals || t.token_decimals || t.tokenDecimals || 18
+      );
+      const balanceRaw = Number(t.balance);
+      const balance = decimals ? balanceRaw / 10 ** decimals : balanceRaw;
+      const defaultSymbol = t.symbol || t.token_symbol || "";
+
+      const meta = await fetchTokenMetadata(tokenAddr, defaultSymbol);
+
+      const totalValueUSD = isFinite(balance) ? balance * meta.priceUSD : 0;
+      const profitLossUSD = totalValueUSD * (meta.percent_change_24h / 100);
+
+      return {
+        tokenAddress: tokenAddr,
+        coinId: meta.coinId,
+        name: meta.name || t.name || t.token_name || "",
+        symbol: meta.symbol,
+        icon: meta.icon,
+        balance: isFinite(balance) ? balance : 0,
+        priceUSD: meta.priceUSD,
+        totalValueUSD,
+        percent_change_1h: meta.percent_change_1h,
+        percent_change_24h: meta.percent_change_24h,
+        percent_change_7d: meta.percent_change_7d,
+        profitLossUSD,
+      };
+    });
+
+    const mapped = (await Promise.all(tokenPromises)).filter((t) => t !== null);
+
+    console.log(`[MORALIS] Processed tokens: ${mapped.length}`);
+    return mapped;
+  } catch (err) {
+    console.warn("[getWalletTokensMoralis] fetch error:", err.message || err);
+    return [];
+  }
+}
+
+// ---------------------------
+// Explorer transfer fetch (multichain, paginated)
+// ---------------------------
+// Returns Etherscan-like transfer objects array (raw explorer result items)
+async function fetchExplorerTokenTransfersPaginated(
+  walletAddress,
+  chainName,
+  pageSize = 100,
+  maxPages = 5
+) {
+  const cn = (chainName || "eth").toLowerCase();
+  const cfg = EXPLORER_CONFIG[cn] || EXPLORER_CONFIG.eth;
+
+  // prefer Etherscan V2 unified endpoint if we have an Etherscan key (covers many chains)
+  if (cfg.provider === "etherscan" && ETHERSCAN_API_KEY) {
+    const chainid = chainNameToEtherscanChainId(cn);
+    let all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const params = new URLSearchParams({
+        chainid: String(chainid),
+        module: "account",
+        action: "tokentx",
+        address: walletAddress,
+        page: String(page),
+        offset: String(pageSize),
+        sort: "desc",
+        apikey: ETHERSCAN_API_KEY,
+      });
+      const url = `${cfg.v2Base}?${params.toString()}`;
+      console.log(`[Etherscan V2] Fetch page ${page} -> ${url}`);
+      try {
+        const data = await safeFetchJson(url);
+        if (!data || !Array.isArray(data.result)) {
+          console.warn(
+            "[Etherscan V2] unexpected response",
+            data && (data.message || data.status)
+          );
+          break;
+        }
+        if (!data.result.length) break;
+        all = all.concat(data.result);
+        if (data.result.length < pageSize) break;
+      } catch (err) {
+        console.warn(
+          "[Etherscan V2] page fetch error:",
+          err.message || err.body || err
+        );
+        break;
+      }
+    }
+    return all;
+  }
+
+  // otherwise fall back to chain-specific explorer (v1-style API)
+  if (cfg.base) {
+    const apiKey = cfg.apiKey || ETHERSCAN_API_KEY;
+    let all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const params = new URLSearchParams({
+        module: "account",
+        action: "tokentx",
+        address: walletAddress,
+        page: String(page),
+        offset: String(pageSize),
+        sort: "desc",
+      });
+      if (apiKey) params.set("apikey", apiKey);
+      const url = `${cfg.base}?${params.toString()}`;
+      console.log(`[Explorer:${cfg.provider}] Fetch page ${page} -> ${url}`);
+      try {
+        const data = await safeFetchJson(url);
+        // many explorers return { status: "1", message: "OK", result: [...] }
+        if (!data || !Array.isArray(data.result)) {
+          console.warn(
+            `[Explorer:${cfg.provider}] unexpected response`,
+            data && (data.message || data.status)
+          );
+          break;
+        }
+        if (!data.result.length) break;
+        all = all.concat(data.result);
+        if (data.result.length < pageSize) break;
+      } catch (err) {
+        console.warn(
+          `[Explorer:${cfg.provider}] page fetch error:`,
+          err.message || err.body || err
+        );
+        break;
+      }
+    }
+    return all;
+  }
+
+  // default empty
+  return [];
+}
+
+// Convert explorer transfer rows into your pipeline shape
+function convertExplorerTransfersToPipelineShape(explorerRows) {
+  return explorerRows.map((t) => {
+    // possible fields across explorers/v2: from, to, contractAddress, tokenSymbol, tokenDecimal, value, hash, timeStamp
+    return {
+      from_address: (t.from || t.from_address || "").toLowerCase(),
+      to_address: (t.to || t.to_address || "").toLowerCase(),
+      token_symbol: t.tokenSymbol || t.token_symbol || t.tokenSymbol || "",
+      token_decimals:
+        t.tokenDecimal || t.token_decimal || t.tokenDecimals || 18,
+      value: t.value,
+      transaction_hash:
+        t.hash || t.txhash || t.transactionHash || t.transaction_hash,
+      token_address: (
+        t.contractAddress ||
+        t.contract_address ||
+        t.contract ||
+        ""
+      ).toLowerCase(),
+      block_timestamp:
+        t.timeStamp || t.timeStamp || t.timeStamp === 0
+          ? new Date(
+              Number(t.timeStamp) *
+                (String(t.timeStamp).length === 10 ? 1000 : 1)
+            ).toISOString()
+          : t.timeStamp || t.block_timestamp || new Date().toISOString(),
+    };
+  });
+}
+
+// derive token balances from transfer rows (works with explorer results or your Etherscan mapped shape)
+async function deriveTokenBalancesFromTransfers(transfers, walletLower) {
+  const map = new Map();
+
+  // Step 1: Aggregate token balances (Synchronous, this is fast)
+  for (const t of transfers) {
+    const contract = (t.contractAddress || t.token_address || "").toLowerCase();
+    const symbol = t.tokenSymbol || t.token_symbol || "";
+    const decimals = Number(t.tokenDecimal || t.token_decimal || 18);
+    const val = Number(t.value || 0);
+    if (!contract || !val) continue;
+
+    const key = `${contract}|${symbol}|${decimals}`;
+    const entry = map.get(key) || { contract, symbol, decimals, net: 0 };
+
+    if ((t.to || "").toLowerCase() === walletLower) entry.net += val;
+    else if ((t.from || "").toLowerCase() === walletLower) entry.net -= val;
+
+    map.set(key, entry);
+  }
+
+  // Step 2: Build token details (Async part)
+  const mapValues = Array.from(map.values());
+
+  // --- PERFORMANCE FIX: Use Promise.all to fetch metadata concurrently ---
+  const tokenPromises = mapValues.map(async (v) => {
+    const quantity = v.net / 10 ** Number(v.decimals || 18);
+    if (!isFinite(quantity) || quantity === 0) return null; // Filter out later
+
+    const meta = await fetchTokenMetadata(v.contract, v.symbol);
+
+    const totalValueUSD = isFinite(meta.priceUSD)
+      ? quantity * meta.priceUSD
+      : 0;
+    const pl = totalValueUSD * (meta.percent_change_24h / 100);
+
+    return {
+      tokenAddress: v.contract,
+      coinId: meta.coinId,
+      name: meta.name,
+      symbol: v.symbol,
+      icon: meta.icon,
+      balance: quantity,
+      priceUSD: meta.priceUSD,
+      totalValueUSD,
+      percent_change_1h: meta.percent_change_1h,
+      percent_change_24h: meta.percent_change_24h,
+      percent_change_7d: meta.percent_change_7d,
+      profitLossUSD: pl,
+    };
+  });
+
+  const tokens = (await Promise.all(tokenPromises)).filter((t) => t !== null);
+
+  return tokens;
+}
+
+// ---------------------------
+// Transfers: try Moralis then multi-explorer fallback (paginated)
+// ---------------------------
+async function fetchTransfers(walletAddress, chain) {
+  const chainName = chainHexToName(chain);
+  const walletLower = walletAddress.toLowerCase();
+
+  // First: try Moralis transfers if key is present
+  if (API_KEY_MORALIS) {
+    const candidates = [
+      {
+        method: "GET",
+        url: `https://deep-index.moralis.io/api/v2.2/${walletAddress}/erc20/transfers?chain=${chainName}&limit=500&order=desc`, // Increased limit
+      },
+      {
+        method: "GET",
+        url: `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/erc20/transfers?chain=${chainName}&limit=500&order=desc`, // Increased limit
+      },
+      // Removed POST candidate for simplicity unless necessary
+    ];
+    for (const c of candidates) {
+      try {
+        console.log(`[Transfers] Trying Moralis ${c.method} ${c.url}`);
+        const headers = {
+          accept: "application/json",
+          "X-API-Key": API_KEY_MORALIS,
+          ...(c.extraHeaders || {}),
+        };
+        const opts = { method: c.method, headers };
+        if (c.method === "POST" && c.body) opts.body = c.body;
+        const data = await safeFetchJson(c.url, opts);
+
+        // Moralis sometimes wraps results in a 'result' key, or is a direct array
+        const result = Array.isArray(data.result)
+          ? data.result
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        if (result.length > 0) {
+          console.log(
+            `[Transfers] Moralis success with ${result.length} transfers.`
+          );
+          return result;
+        }
+
+        console.warn(
+          "[Transfers] Moralis candidate returned no transfers, trying next"
+        );
+      } catch (err) {
+        console.warn(
+          "[Transfers] Moralis candidate failed:",
+          err.message || err.body || err
+        );
+        if (
+          err.status === 401 ||
+          (err.body && String(err.body).includes("Token is invalid format"))
+        ) {
+          console.warn(
+            "[Transfers] Moralis key invalid. Falling back to explorers."
+          );
+          break;
+        }
+      }
+    }
+  } else {
+    console.log(
+      "[Transfers] No Moralis key configured, using explorers fallback"
+    );
+  }
+
+  // Explorer fallback (paginated)
+  const explorerRaw = await fetchExplorerTokenTransfersPaginated(
+    walletAddress,
+    chainName,
+    100,
+    6
+  );
+  if (!explorerRaw || !explorerRaw.length) return [];
+
+  // If these are raw explorer rows, convert into pipeline shape
+  const pipelineRows = convertExplorerTransfersToPipelineShape(explorerRaw);
+  return pipelineRows;
+}
+
+// ---------------------------
+// find or create portfolio (unchanged)
+// ---------------------------
+async function findOrCreatePortfolio(walletAddress, userId) {
+  const lower = walletAddress.toLowerCase();
+
+  // Optimized: Try to find existing portfolio first
+  let portfolio = await Portfolio.findOne({
+    walletAddress: lower,
+    userId: new mongoose.Types.ObjectId(userId),
+  });
+
+  if (portfolio) {
+    console.log("📁 Found existing portfolio:", portfolio._id);
+    return portfolio;
+  }
+
+  // Create if not found
+  portfolio = await Portfolio.create({
+    walletAddress: lower,
+    isBlockchain: true,
+    userId: new mongoose.Types.ObjectId(userId),
+    name: `Portfolio-${lower.slice(0, 6)}...`,
+    chainName: "eth",
+  });
+  console.log("📁 Created new portfolio:", portfolio);
+
+  return portfolio;
+}
+
+// Helper to fetch metadata for a single transaction (used in exports.create)
+async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
+  let tokenMeta = { name: symbol, symbol: symbol, icon: "", priceUSD: 0 };
+  const addressLower = tokenAddress?.toLowerCase();
+
+  if (!addressLower) {
+    tokenMeta.priceUSD = await getTokenPriceUSD(chainName, null, symbol); // Fallback for native token
+    return tokenMeta;
+  }
+
+  try {
+    // 1. Check your Coin (CMC) table (most reliable and fast DB lookup)
+    const coin = await Coin.findOne({
+      "contracts.contract": addressLower,
+    });
+
+    if (coin) {
+      tokenMeta.name = coin.name || symbol;
+      tokenMeta.symbol = coin.symbol || symbol;
+      tokenMeta.icon = coin.logo || "";
+      tokenMeta.priceUSD = coin.price || 0;
+    } else {
+      // 2. Fallback: Dexscreener API (external API call)
+      try {
+        const dexUrl = `https://api.dexscreener.com/latest/dex/tokens/${addressLower}`;
+        const res = await fetch(dexUrl);
+        const data = await res.json();
+        if (data?.pairs?.length > 0) {
+          const pair = data.pairs[0];
+          tokenMeta.name = pair.baseToken?.name || symbol;
+          tokenMeta.symbol = pair.baseToken?.symbol || symbol;
+          tokenMeta.icon = pair.info?.imageUrl || "";
+          tokenMeta.priceUSD = parseFloat(pair.priceUsd) || 0;
+        }
+      } catch (e) {
+        // console.warn(`[Dexscreener fallback failed for ${symbol}]`, e.message);
+      }
+    }
+  } catch (metaErr) {
+    console.warn(`[Token Meta Fetch Error for ${symbol}]`, metaErr.message);
+  }
+
+  // 3. Final price check via Moralis if no price found
+  const pricePerCoin =
+    tokenMeta.priceUSD > 0
+      ? tokenMeta.priceUSD
+      : await getTokenPriceUSD(chainName, tokenAddress, symbol);
+
+  tokenMeta.priceUSD = pricePerCoin;
+
+  return tokenMeta;
+}
+
+// ---------------------------
+// Main: create handler (Refactored for concurrency)
+// ---------------------------
 exports.create = async (createDto, result = {}) => {
   try {
-    const { walletAddress, chain, userId, name, isMe } = createDto;
+    console.log("🔥 [Balance.create] Incoming request:", createDto);
+    const {
+      walletAddress,
+      chain = "eth",
+      userId,
+      name,
+      isMe = false,
+    } = createDto || {};
 
-    // 1. Validate input
-    if (!walletAddress) {
-      result.ex = new Error("walletAddress is required");
-      return result;
+    if (!walletAddress) throw new Error("walletAddress is required");
+    if (!userId) throw new Error("userId is required");
+
+    const chainName = chainHexToName(chain);
+
+    // --- STEP 1: Concurrently fetch tokens, transfers, and portfolio ---
+    // Fetching tokens and transfers are independent, so run them in parallel
+    const [tokensFromMoralis, transfers] = await Promise.all([
+      getWalletTokensMoralis(walletAddress, chainName),
+      fetchTransfers(walletAddress, chainName),
+    ]);
+
+    let tokens = tokensFromMoralis;
+
+    // Fallback logic for tokens (only if Moralis failed to return tokens)
+    if (!tokens.length) {
+      console.log(
+        `[Fallback] deriving tokens from explorer token transfers for chain ${chainName}`
+      );
+      const explorerRaw = await fetchExplorerTokenTransfersPaginated(
+        walletAddress,
+        chainName,
+        100,
+        6
+      );
+      const derived = await deriveTokenBalancesFromTransfers(
+        explorerRaw,
+        walletAddress.toLowerCase()
+      );
+      tokens = derived;
+      console.log(`[Fallback] Derived ${tokens.length} token balances`);
     }
 
-    let tokens = [];
+    // --- STEP 2: Handle Portfolio and Balance Doc ---
+    const portfolio = await findOrCreatePortfolio(walletAddress, userId);
+    console.log("📁 Portfolio ID:", portfolio._id);
 
-    // 2. Fetch tokens from appropriate source
-    if (chain === "sol") {
-      tokens = await getWalletTokensHelius(walletAddress);
-    } else {
-      tokens = await getWalletTokensMoralis(walletAddress, chain);
-    }
-
-    // 3. If no tokens found
-    if (!tokens || tokens.length === 0) {
-      result.data = [];
-      result.message = "No tokens found for this wallet";
-      return result;
-    }
-
-    // 4. Prepare update data
     const updateData = {
       walletAddress: walletAddress.toLowerCase(),
-      tokens,
+      tokens: Array.isArray(tokens) ? tokens : [],
       ...(name && { name }),
       ...(typeof isMe === "boolean" && { isMe }),
-      ...(userId && { userId }),
+      userId: new mongoose.Types.ObjectId(userId),
+      portfolioId: new mongoose.Types.ObjectId(portfolio._id),
+      chainName: chainName,
     };
 
-    // 5. Upsert wallet document (update if exists, otherwise create new)
     const walletDoc = await Balance.findOneAndUpdate(
       { walletAddress: walletAddress.toLowerCase() },
       { $set: updateData },
       { upsert: true, new: true }
     );
+    console.log("💾 [Balance] Wallet saved:", walletDoc.walletAddress);
+
+    // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
+    console.log(`📦 Total transfers available: ${transfers.length}`);
+    const walletLower = walletAddress.toLowerCase();
+    const chainId = new mongoose.Types.ObjectId(userId);
+    const portfolioId = new mongoose.Types.ObjectId(portfolio._id);
+    let address;
+    // Create an array of promises for transactions
+    const txPromises = transfers.map(async (tx) => {
+      const from = (tx.from_address || "").toLowerCase();
+      const to = (tx.to_address || "").toLowerCase();
+      if (!from || !to || from === to) return null;
+      address = from;
+      const direction =
+        from === walletLower ? "out" : to === walletLower ? "in" : null;
+      if (!direction) return null;
+
+      const symbol =
+        tx.token_symbol || tx.tokenSymbol || tx.token_symbol || "UNKNOWN";
+      const decimals = Number(tx.token_decimals || tx.tokenDecimals || 18);
+      const value = Number(tx.value || 0);
+      const quantity = decimals ? value / 10 ** decimals : value;
+      if (!quantity || isNaN(quantity) || quantity <= 0) return null;
+
+      const hash = tx.transaction_hash || tx.transactionHash || tx.hash;
+      if (!hash) return null;
+
+      const tokenAddress = tx.token_address || tx.address || null;
+
+      // Get token metadata and final price (the slow part, now in parallel)
+      const tokenMeta = await getTransactionTokenMeta(
+        tokenAddress,
+        symbol,
+        chainName
+      );
+
+      return {
+        userId: chainId,
+        coinId: tokenMeta.symbol, // Use the resolved symbol
+        name: tokenMeta.name,
+        symbol: tokenMeta.symbol,
+        icon: address,
+        type: "transfer",
+        transferDirection: direction,
+        transactionTime: new Date(
+          tx.block_timestamp || tx.blockTimestamp || Date.now()
+        ),
+        quantity,
+        fee: 0,
+        pricePerCoin: tokenMeta.priceUSD, // Use the resolved price
+        totalSpent: 0,
+        totalReceived: 0,
+        note: tx.from_address,
+        portfolioId: portfolioId,
+        chainName: chainName,
+      };
+    });
+
+    // Execute all transaction lookups concurrently
+    const txs = (await Promise.all(txPromises)).filter((t) => t !== null);
+
+    console.log(`📊 Prepared ${txs.length} transactions for DB insert`);
+    if (txs.length) {
+      console.log("🧩 Sample tx:", JSON.stringify(txs[0], null, 2));
+      const inserted = await Transaction.insertMany(txs, {
+        ordered: false,
+      }).catch((err) => {
+        // Suppress 'duplicate key' errors which are expected in unordered insert
+        if (!err.message || !err.message.includes("duplicate key")) {
+          console.warn(
+            "[insertMany] partial insert error:",
+            err.message || err
+          );
+        }
+        return err?.insertedDocs || [];
+      });
+      console.log(
+        `✅ Inserted ${
+          Array.isArray(inserted) ? inserted.length : 0
+        } transactions`
+      );
+    } else {
+      console.log("⚠️ No new transactions to insert");
+    }
 
     result.data = walletDoc;
-    result.message = "Wallet tokens fetched & saved successfully";
-  } catch (ex) {
-    console.error("[Balance.create] Error:", ex);
-    result.ex = ex.message || ex;
+    result.message = "Done";
+  } catch (err) {
+    console.error("[create] Error:", err.message || err);
+    result.ex = err.message || err;
   } finally {
     return result;
   }
 };
+////////////////////////////////////////////////////////////////////////////
 
-//
-// ---------- EVM: Moralis Fetch -------------
-//
-async function getWalletTokensMoralis(walletAddress, chain = "bsc") {
-  const url = `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/tokens?chain=${chain}`;
-  console.log("[MORALIS] Fetching tokens from:", url);
-
-  const res = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      "X-API-Key": API_KEY_MORALIS,
-    },
-  });
-
-  const tokens = await res.json();
-  console.log("[MORALIS] Raw response:", tokens);
-
-  const mapped = tokens.result.map((t) => ({
-    tokenAddress: t.token_address,
-    name: t.name,
-    symbol: t.symbol,
-    balance: Number(t.balance) / 10 ** t.decimals,
-    priceUSD: t.usd_price || 0,
-    totalValueUSD: (Number(t.balance) / 10 ** t.decimals) * (t.usd_price || 0),
-  }));
-
-  console.log("[MORALIS] Processed tokens:", mapped.length);
-  return mapped;
-}
-
-//
-// ---------- Solana: Helius + Dexscreener Fetch -------------
-//
-async function getWalletTokensHelius(walletAddress) {
-  const balancesUrl = `https://api.helius.xyz/v0/addresses/${walletAddress}/balances?api-key=${API_KEY_HELIUS}`;
-  console.log("[HELIUS] Fetching balances from:", balancesUrl);
-
-  const balancesRes = await fetch(balancesUrl);
-  const balancesData = await balancesRes.json();
-
-  const tokens = [];
-
-  for (const token of balancesData.tokens) {
-    const mint = token.mint;
-
-    // Token metadata
-    const metaUrl = `https://api.helius.xyz/v0/token-metadata?api-key=${API_KEY_HELIUS}`;
-    const metaRes = await fetch(metaUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mintAccounts: [mint] }),
-    });
-    const metaData = await metaRes.json();
-    const info = metaData[0];
-
-    // Token price
-    const dexscreenerUrl = `https://api.dexscreener.com/latest/dex/search?q=${mint}`;
-    const metaResPrice = await fetch(dexscreenerUrl);
-    const metaDataPrice = await metaResPrice.json();
-
-    const balance = token.amount / 10 ** token.decimals;
-
-    const processedToken = {
-      tokenAddress: mint,
-      name:
-        info?.onChainMetadata?.metadata?.data?.name ||
-        info?.offChainMetadata?.metadata?.name,
-      symbol:
-        info?.onChainMetadata?.metadata?.data?.symbol ||
-        info?.offChainMetadata?.metadata?.symbol,
-      balance,
-      priceUSD:
-        info?.tokenInfo?.priceInfo?.pricePerToken ||
-        metaDataPrice?.pairs?.[0]?.priceUsd ||
-        0,
-      totalValueUSD:
-        balance *
-        (info?.tokenInfo?.priceInfo?.pricePerToken ||
-          metaDataPrice?.pairs?.[0]?.priceUsd ||
-          0),
-    };
-
-    console.log("[HELIUS] Processed token:", processedToken);
-
-    tokens.push(processedToken);
-  }
-
-  console.log("[HELIUS] Total tokens processed:", tokens.length);
-  return tokens;
-}
 exports.allAsset = async (byUserIdDto, result = {}) => {
   try {
     const { userId, offset, limit } = byUserIdDto;
@@ -251,6 +921,15 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
      * =============================== */
     const balances = await Balance.find({ userId: userObjectId });
 
+    /** ==============================
+     *  2. FETCH PORTFOLIOS
+     * =============================== */
+    const portfolios = await Portfolio.find({ userId: userObjectId });
+
+    const portfolioAddresses = portfolios.map((p) =>
+      (p.walletAddress || "").toLowerCase()
+    );
+
     const walletData = balances.map((wallet) => {
       const totalValueUSD = wallet.tokens.reduce(
         (sum, token) => sum + (token.totalValueUSD || 0),
@@ -258,7 +937,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       );
 
       return {
-        _id: wallet._id,
+        _id: wallet.portfolioId,
         name: wallet.name,
         walletAddress: wallet.walletAddress,
         isMe: wallet.isMe,
@@ -269,9 +948,23 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       };
     });
 
-    // Split based on isMe flag
-    const myWallets = walletData.filter((w) => w.isMe);
-    const otherWallets = walletData.filter((w) => !w.isMe);
+    // ✅ Classify wallets properly
+    const myWallets = walletData.filter((w) => {
+      const address = (w.walletAddress || "").toLowerCase();
+      return (
+        w.isMe === true ||
+        w.isMe === "true" ||
+        portfolioAddresses.includes(address)
+      );
+    });
+
+    const otherWallets = walletData.filter((w) => {
+      const address = (w.walletAddress || "").toLowerCase();
+      return (
+        !portfolioAddresses.includes(address) &&
+        (w.isMe === false || w.isMe === "false")
+      );
+    });
 
     const myWalletTotal = myWallets.reduce(
       (sum, w) => sum + w.totalValueUSD,
@@ -283,10 +976,8 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     );
 
     /** ==============================
-     *  2. FETCH PORTFOLIOS + TRANSACTIONS
+     *  3. FETCH TRANSACTIONS + COINS
      * =============================== */
-    const portfolios = await Portfolio.find({ userId: userObjectId });
-
     let portfolioData = [];
 
     if (portfolios.length) {
@@ -296,11 +987,15 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       });
 
       const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
-      const coins = await Coin.find({ coinId: { $in: coinIds } });
+
+      const coins = await Coin.find({
+        $or: [{ coinId: { $in: coinIds } }, { symbol: { $in: coinIds } }],
+      });
 
       const coinMap = {};
       for (const coin of coins) {
         coinMap[coin.coinId] = coin;
+        if (coin.symbol) coinMap[coin.symbol] = coin;
       }
 
       const transactionsByPortfolio = {};
@@ -311,7 +1006,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         if (!transactionsByPortfolio[pid]) transactionsByPortfolio[pid] = [];
         if (!portfolioHoldings[pid]) portfolioHoldings[pid] = {};
 
-        const coinInfo = coinMap[tx.coinId] || {};
+        const coinInfo = coinMap[tx.coinId] || coinMap[tx.symbol] || {};
         const coinId = tx.coinId;
 
         transactionsByPortfolio[pid].push({
@@ -349,7 +1044,10 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         let totalValue = 0;
 
         for (const [coinId, qty] of Object.entries(holdings)) {
-          const coin = coinMap[coinId];
+          const coin =
+            coinMap[coinId] ||
+            coinMap[coinId.toUpperCase()] ||
+            coinMap[coinId.toLowerCase()];
           if (coin && coin.price && qty > 0) {
             totalValue += qty * coin.price;
           }
@@ -369,7 +1067,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     );
 
     /** ==============================
-     *  3. FINAL RESULT
+     *  4. FINAL RESULT
      * =============================== */
     result.data = {
       totalMyWallets: myWallets.length,
@@ -387,6 +1085,17 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     };
   } catch (ex) {
     console.error("[getList] Error:", ex);
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+
+exports.getByBalance = async ({ id }, result = {}) => {
+  try {
+    const data = await Balance.findById(id).lean();
+    result.data = data;
+  } catch (ex) {
     result.ex = ex;
   } finally {
     return result;

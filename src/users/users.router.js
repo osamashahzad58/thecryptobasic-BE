@@ -32,6 +32,11 @@ router.get(
   JWT.verifyAccessToken,
   usersController.getUserWatchlist
 );
+router.get(
+  "/getCheckPortfolio",
+  JWT.verifyAccessToken,
+  usersController.getCheckPortfolio
+);
 router.post(
   "/verify-otp",
   [

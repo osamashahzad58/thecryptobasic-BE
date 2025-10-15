@@ -18,7 +18,6 @@ router.get(
   [JWT.verifyAccessToken],
   balanceController.getCombinePortfolio
 );
-
 router.get(
   "/fromBlockchain",
   [JWT.verifyAccessToken],
@@ -26,5 +25,6 @@ router.get(
 
   balanceController.allAsset
 );
+router.get("/:id", balanceController.getByBalance);
 
 module.exports = router;

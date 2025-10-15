@@ -1,4 +1,6 @@
 let User = require("./users.model");
+let Balance = require("../balance/balance.model");
+let Portfolio = require("../portfolio/portfolio.model");
 let Watchlist = require("../watchlist/watchlist.model");
 const mongoose = require("mongoose");
 const { JWT_TOKEN_TYPES } = require("../../helpers/constants");
@@ -288,6 +290,31 @@ exports.getUserWatchlist = async (getUsersDto, result = {}) => {
     }
   } catch (ex) {
     console.error("Error while fetching the question:", ex.message);
+    result.error = true;
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};
+exports.getCheckPortfolio = async (getUsersDto, result = {}) => {
+  try {
+    const { userId } = getUsersDto;
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    const balanceCount = await Balance.countDocuments({ userId: userObjectId });
+    const portfolioCount = await Portfolio.countDocuments({
+      userId: userObjectId,
+    });
+
+    const totalCount = balanceCount + portfolioCount;
+
+    result.data = {
+      totalCount,
+      hasData: totalCount > 0,
+    };
+  } catch (ex) {
+    console.error("Error while checking portfolio and balance:", ex.message);
     result.error = true;
     result.ex = ex.message;
   } finally {
