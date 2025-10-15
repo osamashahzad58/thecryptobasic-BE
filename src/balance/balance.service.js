@@ -675,7 +675,7 @@ exports.create = async (createDto, result = {}) => {
       chain = "eth",
       userId,
       name,
-      isMe = false,
+      isMe,
     } = createDto || {};
 
     if (!walletAddress) throw new Error("walletAddress is required");
@@ -719,10 +719,11 @@ exports.create = async (createDto, result = {}) => {
       walletAddress: walletAddress.toLowerCase(),
       tokens: Array.isArray(tokens) ? tokens : [],
       ...(name && { name }),
-      ...(typeof isMe === "boolean" && { isMe }),
+      isMe: typeof isMe === "boolean" ? isMe : false, // ✅ default false
       userId: new mongoose.Types.ObjectId(userId),
       portfolioId: new mongoose.Types.ObjectId(portfolio._id),
       chainName: chainName,
+      isBlockchain: true,
     };
 
     const walletDoc = await Balance.findOneAndUpdate(
@@ -942,6 +943,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         name: wallet.name,
         walletAddress: wallet.walletAddress,
         isMe: wallet.isMe,
+        isBlockchain: wallet.isBlockchain,
         totalValueUSD: Number(totalValueUSD.toFixed(2)),
         tokenCount: wallet.tokens.length,
         createdAt: wallet.createdAt,
