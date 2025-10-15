@@ -722,6 +722,7 @@ exports.create = async (createDto, result = {}) => {
       ...(typeof isMe === "boolean" && { isMe }),
       userId: new mongoose.Types.ObjectId(userId),
       portfolioId: new mongoose.Types.ObjectId(portfolio._id),
+      chainName: chainName,
     };
 
     const walletDoc = await Balance.findOneAndUpdate(
@@ -736,13 +737,13 @@ exports.create = async (createDto, result = {}) => {
     const walletLower = walletAddress.toLowerCase();
     const chainId = new mongoose.Types.ObjectId(userId);
     const portfolioId = new mongoose.Types.ObjectId(portfolio._id);
-
+    let address;
     // Create an array of promises for transactions
     const txPromises = transfers.map(async (tx) => {
       const from = (tx.from_address || "").toLowerCase();
       const to = (tx.to_address || "").toLowerCase();
       if (!from || !to || from === to) return null;
-
+      address = from;
       const direction =
         from === walletLower ? "out" : to === walletLower ? "in" : null;
       if (!direction) return null;
@@ -771,7 +772,7 @@ exports.create = async (createDto, result = {}) => {
         coinId: tokenMeta.symbol, // Use the resolved symbol
         name: tokenMeta.name,
         symbol: tokenMeta.symbol,
-        icon: tokenMeta.icon,
+        icon: address,
         type: "transfer",
         transferDirection: direction,
         transactionTime: new Date(
@@ -782,7 +783,7 @@ exports.create = async (createDto, result = {}) => {
         pricePerCoin: tokenMeta.priceUSD, // Use the resolved price
         totalSpent: 0,
         totalReceived: 0,
-        note: hash,
+        note: tx.from_address,
         portfolioId: portfolioId,
         chainName: chainName,
       };
