@@ -907,7 +907,6 @@ exports.getList = async (getListDto, result = {}) => {
 exports.getCombinePortfolio = async (getListDto, result = {}) => {
   try {
     const { userId } = getListDto;
-
     if (!userId) {
       result.ex = new Error("userId is required");
       return result;
@@ -915,160 +914,200 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
 
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    /** ==============================
-     *  1. FETCH BALANCES (WALLETS)
-     * =============================== */
-    const balances = await Balance.find({ userId: userObjectId });
+    // 1) fetch balances and portfolios (lean for performance)
+    const balances = await Balance.find({ userId: userObjectId }).lean();
+    const portfolios = await Portfolio.find({ userId: userObjectId }).lean();
 
-    /** ==============================
-     *  2. FETCH PORTFOLIOS
-     * =============================== */
-    const portfolios = await Portfolio.find({ userId: userObjectId });
-
-    const portfolioAddresses = portfolios.map((p) =>
-      (p.walletAddress || "").toLowerCase()
+    // prepare set of portfolio addresses (lowercased, non-empty)
+    const portfolioAddresses = new Set(
+      portfolios
+        .map((p) => (p.walletAddress || "").toLowerCase())
+        .filter(Boolean)
     );
 
-    const walletData = balances.map((wallet) => {
-      const totalValueUSD = wallet.tokens.reduce(
-        (sum, token) => sum + (token.totalValueUSD || 0),
-        0
-      );
-
-      return {
-        _id: wallet.portfolioId,
-        name: wallet.name,
-        walletAddress: wallet.walletAddress,
-        isMe: wallet.isMe,
-        isBlockchain: wallet.isBlockchain,
-        totalValueUSD: Number(totalValueUSD.toFixed(2)),
-        tokenCount: wallet.tokens.length,
-        createdAt: wallet.createdAt,
-        updatedAt: wallet.updatedAt,
-      };
-    });
-
-    // ✅ Classify wallets properly
-    const myWallets = walletData.filter((w) => {
-      const address = (w.walletAddress || "").toLowerCase();
-      return (
-        w.isMe === true ||
-        w.isMe === "true" ||
-        portfolioAddresses.includes(address)
-      );
-    });
-
-    const otherWallets = walletData.filter((w) => {
-      const address = (w.walletAddress || "").toLowerCase();
-      return (
-        !portfolioAddresses.includes(address) &&
-        (w.isMe === false || w.isMe === "false")
-      );
-    });
-
-    const myWalletTotal = myWallets.reduce(
-      (sum, w) => sum + w.totalValueUSD,
-      0
-    );
-    const otherWalletTotal = otherWallets.reduce(
-      (sum, w) => sum + w.totalValueUSD,
-      0
-    );
-
-    /** ==============================
-     *  3. FETCH TRANSACTIONS + COINS
-     * =============================== */
+    // 2) build portfolioData (transactions + holdings -> totalValue)
     let portfolioData = [];
-
     if (portfolios.length) {
       const portfolioIds = portfolios.map((p) => p._id);
       const transactions = await Transaction.find({
         portfolioId: { $in: portfolioIds },
-      });
+      }).lean();
 
-      const coinIds = [...new Set(transactions.map((tx) => tx.coinId))];
-
-      const coins = await Coin.find({
+      const coinIds = [
+        ...new Set(transactions.map((t) => t.coinId).filter(Boolean)),
+      ];
+      const coinDocs = await Coin.find({
         $or: [{ coinId: { $in: coinIds } }, { symbol: { $in: coinIds } }],
-      });
+      }).lean();
 
       const coinMap = {};
-      for (const coin of coins) {
-        coinMap[coin.coinId] = coin;
-        if (coin.symbol) coinMap[coin.symbol] = coin;
+      for (const c of coinDocs) {
+        if (c.coinId) coinMap[c.coinId] = c;
+        if (c.symbol) coinMap[c.symbol] = c;
       }
 
       const transactionsByPortfolio = {};
       const portfolioHoldings = {};
 
       for (const tx of transactions) {
-        const pid = tx.portfolioId.toString();
-        if (!transactionsByPortfolio[pid]) transactionsByPortfolio[pid] = [];
-        if (!portfolioHoldings[pid]) portfolioHoldings[pid] = {};
+        const pid = String(tx.portfolioId);
+        transactionsByPortfolio[pid] = transactionsByPortfolio[pid] || [];
+        portfolioHoldings[pid] = portfolioHoldings[pid] || {};
 
-        const coinInfo = coinMap[tx.coinId] || coinMap[tx.symbol] || {};
-        const coinId = tx.coinId;
-
+        const coinId = tx.coinId || tx.symbol;
         transactionsByPortfolio[pid].push({
-          ...tx.toObject(),
-          coinInfo: {
-            coinId: coinInfo.coinId || tx.coinId,
-            logo: coinInfo.logo || null,
-            price: coinInfo.price || 0,
-            market_cap: coinInfo.market_cap || 0,
-            percent_change_7d: coinInfo.percent_change_7d || 0,
-            percent_change_24h: coinInfo.percent_change_24h || 0,
-            percent_change_1h: coinInfo.percent_change_1h || 0,
-            volume_change_24h: coinInfo.volume_change_24h || 0,
-          },
+          ...tx,
+          coinInfo: (() => {
+            const info = coinMap[tx.coinId] || coinMap[tx.symbol] || {};
+            return {
+              coinId: info.coinId || coinId,
+              logo: info.logo || null,
+              price: info.price || 0,
+              market_cap: info.market_cap || 0,
+              percent_change_7d: info.percent_change_7d || 0,
+              percent_change_24h: info.percent_change_24h || 0,
+              percent_change_1h: info.percent_change_1h || 0,
+              volume_change_24h: info.volume_change_24h || 0,
+            };
+          })(),
         });
 
         const currentQty = portfolioHoldings[pid][coinId] || 0;
-
-        if (tx.type === "buy") {
-          portfolioHoldings[pid][coinId] = currentQty + tx.quantity;
-        } else if (tx.type === "sell") {
-          portfolioHoldings[pid][coinId] = currentQty - tx.quantity;
-        } else if (tx.type === "transfer") {
-          if (tx.transferDirection === "in") {
-            portfolioHoldings[pid][coinId] = currentQty + tx.quantity;
-          } else if (tx.transferDirection === "out") {
-            portfolioHoldings[pid][coinId] = currentQty - tx.quantity;
-          }
+        if (tx.type === "buy")
+          portfolioHoldings[pid][coinId] = currentQty + (tx.quantity || 0);
+        else if (tx.type === "sell")
+          portfolioHoldings[pid][coinId] = currentQty - (tx.quantity || 0);
+        else if (tx.type === "transfer") {
+          if (tx.transferDirection === "in")
+            portfolioHoldings[pid][coinId] = currentQty + (tx.quantity || 0);
+          else if (tx.transferDirection === "out")
+            portfolioHoldings[pid][coinId] = currentQty - (tx.quantity || 0);
         }
       }
 
-      portfolioData = portfolios.map((portfolio) => {
-        const pid = portfolio._id.toString();
+      portfolioData = portfolios.map((p) => {
+        const pid = String(p._id);
         const holdings = portfolioHoldings[pid] || {};
         let totalValue = 0;
-
         for (const [coinId, qty] of Object.entries(holdings)) {
           const coin =
             coinMap[coinId] ||
-            coinMap[coinId.toUpperCase()] ||
-            coinMap[coinId.toLowerCase()];
-          if (coin && coin.price && qty > 0) {
-            totalValue += qty * coin.price;
-          }
+            coinMap[coinId.toUpperCase?.() || ""] ||
+            coinMap[coinId.toLowerCase?.() || ""];
+          if (coin && coin.price && qty > 0) totalValue += qty * coin.price;
         }
-
         return {
-          ...portfolio.toObject(),
+          ...p,
           totalValue: Number(totalValue.toFixed(2)),
           transactions: transactionsByPortfolio[pid] || [],
         };
       });
     }
 
+    // 3) wallet entries from balances
+    const walletDataFromBalances = balances.map((w) => {
+      const totalValueUSD = (w.tokens || []).reduce(
+        (sum, t) => sum + (Number(t.totalValueUSD) || 0),
+        0
+      );
+      return {
+        _id: w._id,
+        name: w.name,
+        walletAddress: w.walletAddress || null,
+        isMe: w.isMe,
+        isBlockchain: w.isBlockchain,
+        userId: w.userId,
+        totalValueUSD: Number(totalValueUSD.toFixed(2)),
+        tokenCount: (w.tokens || []).length,
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt,
+        source: "balance",
+      };
+    });
+
+    // 4) wallet entries from portfolios that don't duplicate balance addresses
+    const existingAddresses = new Set(
+      walletDataFromBalances
+        .map((w) => (w.walletAddress || "").toLowerCase())
+        .filter(Boolean)
+    );
+    const walletDataFromPortfolios = portfolioData
+      .map((p) => ({
+        _id: p._id,
+        name: p.name || p.url || `Portfolio-${String(p._id).slice(-6)}`,
+        walletAddress: p.walletAddress || null,
+        isMe: p.isMe,
+        isBlockchain: p.isBlockchain,
+        userId: p.userId,
+        totalValueUSD: Number((p.totalValue || 0).toFixed(2)),
+        tokenCount: (p.transactions || []).length,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        source: "portfolio",
+      }))
+      .filter((p) => {
+        const a = (p.walletAddress || "").toLowerCase();
+        return !a || !existingAddresses.has(a); // keep no-address portfolios; skip duplicate addresses
+      });
+
+    const walletData = [...walletDataFromBalances, ...walletDataFromPortfolios];
+
+    // 5) classification rules:
+    // - explicit isMe true => myWallets
+    // - explicit isMe false => otherWallets
+    // - undefined isMe => fallback: portfolioAddresses or same userId => myWallets, otherwise otherWallets
+
+    function isTrueish(v) {
+      if (v === true) return true;
+      if (typeof v === "string") return v.toLowerCase() === "true";
+      return false;
+    }
+    function isFalseish(v) {
+      if (v === false) return true;
+      if (typeof v === "string") return v.toLowerCase() === "false";
+      return false;
+    }
+
+    const myWallets = [];
+    const otherWallets = [];
+
+    for (const w of walletData) {
+      const addr = (w.walletAddress || "").toLowerCase();
+      // explicit checks first
+      if (isTrueish(w.isMe)) {
+        myWallets.push(w);
+        continue;
+      }
+      if (isFalseish(w.isMe)) {
+        otherWallets.push(w);
+        continue;
+      }
+      // fallback when isMe undefined/null
+      if (addr && portfolioAddresses.has(addr)) {
+        myWallets.push(w);
+        continue;
+      }
+      if (!w.walletAddress && String(w.userId || "") === String(userObjectId)) {
+        myWallets.push(w);
+        continue;
+      }
+      // default
+      otherWallets.push(w);
+    }
+
+    const myWalletTotal = myWallets.reduce(
+      (s, x) => s + (x.totalValueUSD || 0),
+      0
+    );
+    const otherWalletTotal = otherWallets.reduce(
+      (s, x) => s + (x.totalValueUSD || 0),
+      0
+    );
     const totalPortfolioValue = portfolioData.reduce(
-      (sum, p) => sum + (p.totalValue || 0),
+      (s, p) => s + (p.totalValue || 0),
       0
     );
 
-    /** ==============================
-     *  4. FINAL RESULT
-     * =============================== */
     result.data = {
       totalMyWallets: myWallets.length,
       totalOtherWallets: otherWallets.length,
@@ -1084,7 +1123,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
       portfolios: portfolioData,
     };
   } catch (ex) {
-    console.error("[getList] Error:", ex);
+    console.error("[getCombinePortfolio] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
