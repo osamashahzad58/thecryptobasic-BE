@@ -79,7 +79,7 @@ class DexScreenerWPBot {
     const symbol = pairData.baseToken.symbol?.toLowerCase() || "token";
     const chain = pairData.chainId?.toLowerCase() || "crypto";
     const contract = pairData.baseToken.address || "";
-    return `${symbol}-${chain}-${contract}`;
+    return `${contract}`;
   }
 
   // Fetch newly listed tokens
