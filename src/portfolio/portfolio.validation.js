@@ -6,6 +6,7 @@ module.exports = {
     body: Joi.object({
       name: Joi.string().required(),
       url: Joi.string().uri().allow(null, "").optional(),
+      isMe: Joi.boolean().allow(null).default(false),
     }),
   },
   stats: {
