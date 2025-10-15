@@ -9,8 +9,6 @@ const path = require("path");
 registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
   family: "NotoSans",
 });
-
-// Try common CJK font locations
 const possibleCJKPaths = [
   "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
