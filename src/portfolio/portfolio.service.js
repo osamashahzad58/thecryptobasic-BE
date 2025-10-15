@@ -666,8 +666,8 @@ exports.portfolioAsset = async (getDto, result = {}) => {
         percent_change_24h: Number(coin.percent_change_24h || 0),
         percent_change_1h: Number(coin.percent_change_1h || 0),
         volume_change_24h: Number(coin.volume_change_24h || 0),
-        holdingQuantity: qty,
-        value: coinValue,
+        value: qty,
+        balance: coinValue,
       });
     }
 
