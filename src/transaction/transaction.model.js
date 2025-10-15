@@ -63,7 +63,10 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-
+    chainName: {
+      type: String,
+      trim: true,
+    },
     icon: {
       type: String,
       trim: true,

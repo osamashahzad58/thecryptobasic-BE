@@ -9,6 +9,8 @@ const coins = require("../cmc-coins/models/cmc-coins.model");
 const Coin = require("../cmc-coins/models/cmc-coins.model");
 const mongoose = require("mongoose");
 const { ObjectId } = require("mongodb");
+
+// --- API Keys ---
 const API_KEY_MORALIS = (
   process.env.API_KEY_MORALIS ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImEzOWVhMDU5LWQwNTEtNGNiOS05MTg2LTIxZjBhNDMwNzY1YyIsIm9yZ0lkIjoiNDcwMjM4IiwidXNlcklkIjoiNDgzNzQ2IiwidHlwZUlkIjoiM2RkMzNiNTctZjVlMS00NzE2LWE1NWMtNzAxYzM5NThlODliIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTc1NzE1ODEsImV4cCI6NDkxMzMzMTU4MX0.4pvqmwvn7F4p-mPJt4jQahho771hL0wwQyrDH_ccotk"
@@ -122,6 +124,106 @@ async function safeFetchJson(url, opts = {}) {
 }
 
 // ---------------------------
+// Price helper (Moralis primary, fallback map)
+// ---------------------------
+function fallbackPrice(symbol) {
+  const fallback = {
+    ETH: 2600,
+    BNB: 600,
+    MATIC: 0.8,
+    AVAX: 25,
+    ARB: 0.9,
+    USDT: 1,
+    USDC: 1,
+  };
+  return fallback[(symbol || "").toUpperCase()] || 0;
+}
+
+async function getTokenPriceUSD(chain, tokenAddress, symbol = "ETH") {
+  try {
+    if (!API_KEY_MORALIS) return fallbackPrice(symbol);
+    const chainName = chainHexToName(chain);
+    const address =
+      !tokenAddress || /^eth$/i.test(symbol)
+        ? "native"
+        : tokenAddress.toLowerCase();
+    const url = `https://deep-index.moralis.io/api/v2.2/erc20/${address}/price?chain=${chainName}`;
+    const data = await safeFetchJson(url, {
+      headers: { accept: "application/json", "X-API-Key": API_KEY_MORALIS },
+    }).catch(() => ({}));
+    const usd = data?.usdPrice || data?.usd_price || 0;
+    if (usd && !isNaN(Number(usd))) return Number(usd);
+    return fallbackPrice(symbol);
+  } catch (err) {
+    console.warn("[getTokenPriceUSD] error:", err.message || err);
+    return fallbackPrice(symbol);
+  }
+}
+
+// Helper to fetch token metadata from DB/Dexscreener (used by multiple functions)
+async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
+  // Default values
+  let name = defaultSymbol;
+  let symbol = defaultSymbol;
+  let priceUSD = 0;
+  let percent_change_1h = 0;
+  let percent_change_24h = 0;
+  let percent_change_7d = 0;
+  let icon = "";
+  let coinId = null;
+
+  try {
+    // 1. Try to get more accurate data from your CMC table
+    // NOTE: Using exact match on tokenAddr instead of $regex for speed if possible
+    const coin = await coins.findOne({
+      "contracts.contract": tokenAddr.toLowerCase(),
+    });
+
+    if (coin) {
+      name = coin.name || name;
+      symbol = coin.symbol || symbol;
+      icon = coin.logo || "";
+      coinId = coin.coinId || null;
+      priceUSD = Number(coin.price || priceUSD || 0);
+      percent_change_1h = Number(coin.percent_change_1h || 0);
+      percent_change_24h = Number(coin.percent_change_24h || 0);
+      percent_change_7d = Number(coin.percent_change_7d || 0);
+    } else {
+      // 2. Fallback: Dexscreener API
+      try {
+        const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddr}`;
+        const res = await fetch(dsUrl);
+        const dsData = await res.json();
+
+        if (dsData && Array.isArray(dsData.pairs) && dsData.pairs.length > 0) {
+          const pair = dsData.pairs[0];
+          priceUSD = Number(pair.priceUsd || 0);
+          // Dexscreener gives priceChange.h1, h24. No h7d.
+          percent_change_1h = Number(pair.priceChange?.h1 || 0);
+          percent_change_24h = Number(pair.priceChange?.h24 || 0);
+          icon = pair.info?.imageUrl || "";
+        }
+      } catch (dsErr) {
+        // console.warn(`[Dexscreener] error for ${tokenAddr}:`, dsErr.message);
+      }
+    }
+  } catch (err) {
+    console.warn(`[CMC-Coins] lookup failed for ${tokenAddr}:`, err.message);
+  }
+
+  return {
+    name,
+    symbol,
+    icon,
+    coinId,
+    priceUSD,
+    percent_change_1h,
+    percent_change_24h,
+    percent_change_7d,
+  };
+}
+
+// ---------------------------
 // Moralis token balances (primary)
 // ---------------------------
 async function getWalletTokensMoralis(walletAddress, chain) {
@@ -160,16 +262,15 @@ async function getWalletTokensMoralis(walletAddress, chain) {
       return [];
     }
 
-    const mapped = [];
-
-    for (const t of arr) {
+    // --- PERFORMANCE FIX: Use Promise.all to fetch metadata concurrently ---
+    const tokenPromises = arr.map(async (t) => {
       if (
         !t ||
         !(t.token_address || t.tokenAddress) ||
         t.balance === undefined ||
         isNaN(Number(t.balance))
       ) {
-        continue;
+        return null; // Filter out later
       }
 
       const tokenAddr = (t.token_address || t.tokenAddress || "").toLowerCase();
@@ -178,82 +279,30 @@ async function getWalletTokensMoralis(walletAddress, chain) {
       );
       const balanceRaw = Number(t.balance);
       const balance = decimals ? balanceRaw / 10 ** decimals : balanceRaw;
+      const defaultSymbol = t.symbol || t.token_symbol || "";
 
-      // Default values
-      let name = t.name || t.token_name || "";
-      let symbol = t.symbol || t.token_symbol || "";
-      let priceUSD = Number(t.usd_price || t.usdPrice || 0);
-      let percent_change_1h = 0;
-      let percent_change_24h = 0;
-      let percent_change_7d = 0;
-      let icon = "";
-      let coinId = null;
+      const meta = await fetchTokenMetadata(tokenAddr, defaultSymbol);
 
-      // Try to get more accurate data from your CMC table
-      try {
-        const coin = await coins.findOne({
-          "contracts.contract": { $regex: new RegExp(`^${tokenAddr}$`, "i") },
-        });
-        if (coin) {
-          name = coin.name || name;
-          symbol = coin.symbol || symbol;
-          icon = coin.logo || "";
-          coinId = coin.coinId || null;
-          priceUSD = Number(coin.price || priceUSD || 0);
-          percent_change_1h = Number(coin.percent_change_1h || 0);
-          percent_change_24h = Number(coin.percent_change_24h || 0);
-          percent_change_7d = Number(coin.percent_change_7d || 0);
-        } else {
-          // Fallback: Dexscreener API
-          try {
-            const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddr}`;
-            const res = await fetch(dsUrl);
-            const dsData = await res.json();
+      const totalValueUSD = isFinite(balance) ? balance * meta.priceUSD : 0;
+      const profitLossUSD = totalValueUSD * (meta.percent_change_24h / 100);
 
-            if (
-              dsData &&
-              Array.isArray(dsData.pairs) &&
-              dsData.pairs.length > 0
-            ) {
-              const pair = dsData.pairs[0];
-              priceUSD = Number(pair.priceUsd || 0);
-              percent_change_1h = Number(pair.priceChange?.h1 || 0);
-              percent_change_24h = Number(pair.priceChange?.h24 || 0);
-              percent_change_7d = Number(pair.priceChange?.h7d || 0);
-              icon = pair.info?.imageUrl || "";
-            }
-          } catch (dsErr) {
-            console.warn(
-              `[Dexscreener] error for ${tokenAddr}:`,
-              dsErr.message
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          `[CMC-Coins] lookup failed for ${tokenAddr}:`,
-          err.message
-        );
-      }
-
-      const totalValueUSD = isFinite(balance) ? balance * priceUSD : 0;
-      const profitLossUSD = totalValueUSD * (percent_change_24h / 100);
-
-      mapped.push({
+      return {
         tokenAddress: tokenAddr,
-        coinId,
-        name,
-        symbol,
-        icon,
+        coinId: meta.coinId,
+        name: meta.name || t.name || t.token_name || "",
+        symbol: meta.symbol,
+        icon: meta.icon,
         balance: isFinite(balance) ? balance : 0,
-        priceUSD,
+        priceUSD: meta.priceUSD,
         totalValueUSD,
-        percent_change_1h,
-        percent_change_24h,
-        percent_change_7d,
+        percent_change_1h: meta.percent_change_1h,
+        percent_change_24h: meta.percent_change_24h,
+        percent_change_7d: meta.percent_change_7d,
         profitLossUSD,
-      });
-    }
+      };
+    });
+
+    const mapped = (await Promise.all(tokenPromises)).filter((t) => t !== null);
 
     console.log(`[MORALIS] Processed tokens: ${mapped.length}`);
     return mapped;
@@ -391,12 +440,10 @@ function convertExplorerTransfersToPipelineShape(explorerRows) {
 }
 
 // derive token balances from transfer rows (works with explorer results or your Etherscan mapped shape)
-// make this async so we can use await inside
-
 async function deriveTokenBalancesFromTransfers(transfers, walletLower) {
   const map = new Map();
 
-  // Step 1: Aggregate token balances
+  // Step 1: Aggregate token balances (Synchronous, this is fast)
   for (const t of transfers) {
     const contract = (t.contractAddress || t.token_address || "").toLowerCase();
     const symbol = t.tokenSymbol || t.token_symbol || "";
@@ -413,85 +460,38 @@ async function deriveTokenBalancesFromTransfers(transfers, walletLower) {
     map.set(key, entry);
   }
 
-  // Step 2: Build token details
-  const tokens = [];
+  // Step 2: Build token details (Async part)
+  const mapValues = Array.from(map.values());
 
-  for (const [, v] of map) {
+  // --- PERFORMANCE FIX: Use Promise.all to fetch metadata concurrently ---
+  const tokenPromises = mapValues.map(async (v) => {
     const quantity = v.net / 10 ** Number(v.decimals || 18);
-    if (!isFinite(quantity) || quantity === 0) continue;
+    if (!isFinite(quantity) || quantity === 0) return null; // Filter out later
 
-    let priceUSD = 0;
-    let percent_change_1h = 0;
-    let percent_change_24h = 0;
-    let percent_change_7d = 0;
-    let icon = "";
-    let totalValueUSD = 0;
-    let pl = 0;
-    let name = v.symbol;
-    let coinId = null;
+    const meta = await fetchTokenMetadata(v.contract, v.symbol);
 
-    // Step 3: Try to find in CMC-Coins DB
-    try {
-      const coin = await coins.findOne({
-        "contracts.contract": { $regex: new RegExp(`^${v.contract}$`, "i") },
-      });
-      console.log(coin.name, "coin:::::::::::::::::::::::::");
-      if (coin) {
-        name = coin.name || name;
-        symbol = coin.symbol || symbol;
-        icon = coin.logo || "";
-        coinId = coin.coinId || null;
-        priceUSD = Number(coin.price || priceUSD || 0);
-        percent_change_1h = Number(coin.percent_change_1h || 0);
-        percent_change_24h = Number(coin.percent_change_24h || 0);
-        percent_change_7d = Number(coin.percent_change_7d || 0);
-      } else {
-        // Fallback: Dexscreener API
-        try {
-          const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddr}`;
-          console.log(dsUrl, "dsUrl");
-          const res = await fetch(dsUrl);
-          const dsData = await res.json();
+    const totalValueUSD = isFinite(meta.priceUSD)
+      ? quantity * meta.priceUSD
+      : 0;
+    const pl = totalValueUSD * (meta.percent_change_24h / 100);
 
-          if (
-            dsData &&
-            Array.isArray(dsData.pairs) &&
-            dsData.pairs.length > 0
-          ) {
-            const pair = dsData.pairs[0];
-            priceUSD = Number(pair.priceUsd || 0);
-            percent_change_1h = Number(pair.priceChange?.h1 || 0);
-            percent_change_24h = Number(pair.priceChange?.h24 || 0);
-            percent_change_7d = Number(pair.priceChange?.h7d || 0);
-            icon = pair.info?.imageUrl || "";
-          }
-        } catch (dsErr) {
-          console.warn(`[Dexscreener] error for ${tokenAddr}:`, dsErr.message);
-        }
-      }
-    } catch (err) {
-      console.warn(`[CMC-Coins] lookup failed for ${tokenAddr}:`, err.message);
-    }
-
-    // Step 5: Final calculations
-    totalValueUSD = isFinite(priceUSD) ? quantity * priceUSD : 0;
-    pl = totalValueUSD * (percent_change_24h / 100);
-
-    tokens.push({
+    return {
       tokenAddress: v.contract,
-      coinId,
-      name,
+      coinId: meta.coinId,
+      name: meta.name,
       symbol: v.symbol,
-      icon,
+      icon: meta.icon,
       balance: quantity,
-      priceUSD,
+      priceUSD: meta.priceUSD,
       totalValueUSD,
-      percent_change_1h,
-      percent_change_24h,
-      percent_change_7d,
+      percent_change_1h: meta.percent_change_1h,
+      percent_change_24h: meta.percent_change_24h,
+      percent_change_7d: meta.percent_change_7d,
       profitLossUSD: pl,
-    });
-  }
+    };
+  });
+
+  const tokens = (await Promise.all(tokenPromises)).filter((t) => t !== null);
 
   return tokens;
 }
@@ -508,18 +508,13 @@ async function fetchTransfers(walletAddress, chain) {
     const candidates = [
       {
         method: "GET",
-        url: `https://deep-index.moralis.io/api/v2.2/${walletAddress}/erc20/transfers?chain=${chainName}&limit=100&order=desc`,
+        url: `https://deep-index.moralis.io/api/v2.2/${walletAddress}/erc20/transfers?chain=${chainName}&limit=500&order=desc`, // Increased limit
       },
       {
         method: "GET",
-        url: `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/erc20/transfers?chain=${chainName}&limit=100&order=desc`,
+        url: `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/erc20/transfers?chain=${chainName}&limit=500&order=desc`, // Increased limit
       },
-      {
-        method: "POST",
-        url: `https://deep-index.moralis.io/api/v2.2/wallet/${walletAddress}/erc20/transfers`,
-        body: JSON.stringify({ chain: chainName, limit: 100, order: "desc" }),
-        extraHeaders: { "Content-Type": "application/json" },
-      },
+      // Removed POST candidate for simplicity unless necessary
     ];
     for (const c of candidates) {
       try {
@@ -532,10 +527,23 @@ async function fetchTransfers(walletAddress, chain) {
         const opts = { method: c.method, headers };
         if (c.method === "POST" && c.body) opts.body = c.body;
         const data = await safeFetchJson(c.url, opts);
-        if (Array.isArray(data.result)) return data.result;
-        if (Array.isArray(data)) return data;
+
+        // Moralis sometimes wraps results in a 'result' key, or is a direct array
+        const result = Array.isArray(data.result)
+          ? data.result
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        if (result.length > 0) {
+          console.log(
+            `[Transfers] Moralis success with ${result.length} transfers.`
+          );
+          return result;
+        }
+
         console.warn(
-          "[Transfers] Moralis candidate returned no array, trying next"
+          "[Transfers] Moralis candidate returned no transfers, trying next"
         );
       } catch (err) {
         console.warn(
@@ -574,64 +582,90 @@ async function fetchTransfers(walletAddress, chain) {
 }
 
 // ---------------------------
-// Price helper (Moralis primary, fallback map)
-// ---------------------------
-async function getTokenPriceUSD(chain, tokenAddress, symbol = "ETH") {
-  try {
-    if (!API_KEY_MORALIS) return fallbackPrice(symbol);
-    const chainName = chainHexToName(chain);
-    const address =
-      !tokenAddress || /^eth$/i.test(symbol)
-        ? "native"
-        : tokenAddress.toLowerCase();
-    const url = `https://deep-index.moralis.io/api/v2.2/erc20/${address}/price?chain=${chainName}`;
-    const data = await safeFetchJson(url, {
-      headers: { accept: "application/json", "X-API-Key": API_KEY_MORALIS },
-    }).catch(() => ({}));
-    const usd = data?.usdPrice || data?.usd_price || 0;
-    if (usd && !isNaN(Number(usd))) return Number(usd);
-    return fallbackPrice(symbol);
-  } catch (err) {
-    console.warn("[getTokenPriceUSD] error:", err.message || err);
-    return fallbackPrice(symbol);
-  }
-}
-
-function fallbackPrice(symbol) {
-  const fallback = {
-    ETH: 2600,
-    BNB: 600,
-    MATIC: 0.8,
-    AVAX: 25,
-    ARB: 0.9,
-    USDT: 1,
-    USDC: 1,
-  };
-  return fallback[(symbol || "").toUpperCase()] || 0;
-}
-
-// ---------------------------
 // find or create portfolio (unchanged)
 // ---------------------------
 async function findOrCreatePortfolio(walletAddress, userId) {
   const lower = walletAddress.toLowerCase();
-  // let portfolio = await Portfolio.create({
-  //   walletAddress: lower,
-  //   userId: new mongoose.Types.ObjectId(userId),
-  // });
-  let portfolio = await Portfolio.create({
+
+  // Optimized: Try to find existing portfolio first
+  let portfolio = await Portfolio.findOne({
+    walletAddress: lower,
+    userId: new mongoose.Types.ObjectId(userId),
+  });
+
+  if (portfolio) {
+    console.log("📁 Found existing portfolio:", portfolio._id);
+    return portfolio;
+  }
+
+  // Create if not found
+  portfolio = await Portfolio.create({
     walletAddress: lower,
     isBlockchain: true,
     userId: new mongoose.Types.ObjectId(userId),
     name: `Portfolio-${lower.slice(0, 6)}...`,
+    chainName: "eth",
   });
-  console.log("📁 Created new portfolio:", portfolio._id);
+  console.log("📁 Created new portfolio:", portfolio);
 
   return portfolio;
 }
 
+// Helper to fetch metadata for a single transaction (used in exports.create)
+async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
+  let tokenMeta = { name: symbol, symbol: symbol, icon: "", priceUSD: 0 };
+  const addressLower = tokenAddress?.toLowerCase();
+
+  if (!addressLower) {
+    tokenMeta.priceUSD = await getTokenPriceUSD(chainName, null, symbol); // Fallback for native token
+    return tokenMeta;
+  }
+
+  try {
+    // 1. Check your Coin (CMC) table (most reliable and fast DB lookup)
+    const coin = await Coin.findOne({
+      "contracts.contract": addressLower,
+    });
+
+    if (coin) {
+      tokenMeta.name = coin.name || symbol;
+      tokenMeta.symbol = coin.symbol || symbol;
+      tokenMeta.icon = coin.logo || "";
+      tokenMeta.priceUSD = coin.price || 0;
+    } else {
+      // 2. Fallback: Dexscreener API (external API call)
+      try {
+        const dexUrl = `https://api.dexscreener.com/latest/dex/tokens/${addressLower}`;
+        const res = await fetch(dexUrl);
+        const data = await res.json();
+        if (data?.pairs?.length > 0) {
+          const pair = data.pairs[0];
+          tokenMeta.name = pair.baseToken?.name || symbol;
+          tokenMeta.symbol = pair.baseToken?.symbol || symbol;
+          tokenMeta.icon = pair.info?.imageUrl || "";
+          tokenMeta.priceUSD = parseFloat(pair.priceUsd) || 0;
+        }
+      } catch (e) {
+        // console.warn(`[Dexscreener fallback failed for ${symbol}]`, e.message);
+      }
+    }
+  } catch (metaErr) {
+    console.warn(`[Token Meta Fetch Error for ${symbol}]`, metaErr.message);
+  }
+
+  // 3. Final price check via Moralis if no price found
+  const pricePerCoin =
+    tokenMeta.priceUSD > 0
+      ? tokenMeta.priceUSD
+      : await getTokenPriceUSD(chainName, tokenAddress, symbol);
+
+  tokenMeta.priceUSD = pricePerCoin;
+
+  return tokenMeta;
+}
+
 // ---------------------------
-// Main: create handler (unchanged flow, improved multi-chain handling)
+// Main: create handler (Refactored for concurrency)
 // ---------------------------
 exports.create = async (createDto, result = {}) => {
   try {
@@ -649,8 +683,16 @@ exports.create = async (createDto, result = {}) => {
 
     const chainName = chainHexToName(chain);
 
-    // 1) tokens (Moralis primary, explorer fallback -> derive from transfers)
-    let tokens = await getWalletTokensMoralis(walletAddress, chainName);
+    // --- STEP 1: Concurrently fetch tokens, transfers, and portfolio ---
+    // Fetching tokens and transfers are independent, so run them in parallel
+    const [tokensFromMoralis, transfers] = await Promise.all([
+      getWalletTokensMoralis(walletAddress, chainName),
+      fetchTransfers(walletAddress, chainName),
+    ]);
+
+    let tokens = tokensFromMoralis;
+
+    // Fallback logic for tokens (only if Moralis failed to return tokens)
     if (!tokens.length) {
       console.log(
         `[Fallback] deriving tokens from explorer token transfers for chain ${chainName}`
@@ -668,10 +710,11 @@ exports.create = async (createDto, result = {}) => {
       tokens = derived;
       console.log(`[Fallback] Derived ${tokens.length} token balances`);
     }
-    // 3) portfolio
+
+    // --- STEP 2: Handle Portfolio and Balance Doc ---
     const portfolio = await findOrCreatePortfolio(walletAddress, userId);
     console.log("📁 Portfolio ID:", portfolio._id);
-    // 2) save Balance doc
+
     const updateData = {
       walletAddress: walletAddress.toLowerCase(),
       tokens: Array.isArray(tokens) ? tokens : [],
@@ -688,105 +731,44 @@ exports.create = async (createDto, result = {}) => {
     );
     console.log("💾 [Balance] Wallet saved:", walletDoc.walletAddress);
 
-    // 4) transfers (Moralis first, explorer fallback paginated)
-    const transfers = await fetchTransfers(walletAddress, chainName);
+    // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
     console.log(`📦 Total transfers available: ${transfers.length}`);
-
-    // 5) process & insert transactions (same logic as before)
-    // 5) process & insert transactions (same logic as before, but with name/symbol/icon)
     const walletLower = walletAddress.toLowerCase();
-    const txs = [];
+    const chainId = new mongoose.Types.ObjectId(userId);
+    const portfolioId = new mongoose.Types.ObjectId(portfolio._id);
 
-    for (const tx of transfers) {
+    // Create an array of promises for transactions
+    const txPromises = transfers.map(async (tx) => {
       const from = (tx.from_address || "").toLowerCase();
       const to = (tx.to_address || "").toLowerCase();
-      if (!from || !to || from === to) continue;
+      if (!from || !to || from === to) return null;
 
       const direction =
         from === walletLower ? "out" : to === walletLower ? "in" : null;
-      if (!direction) continue;
+      if (!direction) return null;
 
       const symbol =
         tx.token_symbol || tx.tokenSymbol || tx.token_symbol || "UNKNOWN";
       const decimals = Number(tx.token_decimals || tx.tokenDecimals || 18);
       const value = Number(tx.value || 0);
       const quantity = decimals ? value / 10 ** decimals : value;
-      if (!quantity || isNaN(quantity) || quantity <= 0) continue;
+      if (!quantity || isNaN(quantity) || quantity <= 0) return null;
 
       const hash = tx.transaction_hash || tx.transactionHash || tx.hash;
-      if (!hash) continue;
+      if (!hash) return null;
 
       const tokenAddress = tx.token_address || tx.address || null;
-      const chainName = chainHexToName(chain);
 
-      // Lookup token info (name, icon, price)
-      let tokenMeta = {
-        name: symbol,
-        symbol: symbol,
-        icon: "",
-        priceUSD: 0,
-      };
+      // Get token metadata and final price (the slow part, now in parallel)
+      const tokenMeta = await getTransactionTokenMeta(
+        tokenAddress,
+        symbol,
+        chainName
+      );
 
-      try {
-        // Check from your Balance tokens first
-        const bal = await Balance.findOne({
-          "tokens.tokenAddress": tokenAddress?.toLowerCase(),
-        });
-        if (bal) {
-          const token = bal.tokens.find(
-            (t) => t.tokenAddress.toLowerCase() === tokenAddress?.toLowerCase()
-          );
-          if (token) {
-            tokenMeta.name = token.name || symbol;
-            tokenMeta.symbol = token.symbol || symbol;
-            tokenMeta.icon = token.icon || "";
-            tokenMeta.priceUSD = token.priceUSD || 0;
-          }
-        } else {
-          // fallback: check your Coin (CMC) table
-          const coin = await Coin.findOne({
-            "contracts.contract": {
-              $regex: new RegExp(`^${tokenAddress}$`, "i"),
-            },
-          });
-          if (coin) {
-            tokenMeta.name = coin.name || symbol;
-            tokenMeta.symbol = coin.symbol || symbol;
-            tokenMeta.icon = coin.logo || "";
-            tokenMeta.priceUSD = coin.price || 0;
-          } else {
-            // fallback: Dexscreener
-            try {
-              const dexUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
-              const res = await fetch(dexUrl);
-              const data = await res.json();
-              if (data?.pairs?.length > 0) {
-                const pair = data.pairs[0];
-                tokenMeta.name = pair.baseToken?.name || symbol;
-                tokenMeta.symbol = pair.baseToken?.symbol || symbol;
-                tokenMeta.icon = pair.info?.imageUrl || "";
-                tokenMeta.priceUSD = parseFloat(pair.priceUsd) || 0;
-              }
-            } catch (e) {
-              console.warn(
-                `[Dexscreener fallback failed for ${symbol}]`,
-                e.message
-              );
-            }
-          }
-        }
-      } catch (metaErr) {
-        console.warn(`[Token Meta Fetch Error for ${symbol}]`, metaErr.message);
-      }
-
-      const pricePerCoin =
-        tokenMeta.priceUSD > 0
-          ? tokenMeta.priceUSD
-          : await getTokenPriceUSD(chainName, tokenAddress, symbol);
-
-      txs.push({
-        userId: new mongoose.Types.ObjectId(userId),
-        coinId: symbol,
+      return {
+        userId: chainId,
+        coinId: tokenMeta.symbol, // Use the resolved symbol
         name: tokenMeta.name,
         symbol: tokenMeta.symbol,
         icon: tokenMeta.icon,
@@ -797,22 +779,31 @@ exports.create = async (createDto, result = {}) => {
         ),
         quantity,
         fee: 0,
-        pricePerCoin,
+        pricePerCoin: tokenMeta.priceUSD, // Use the resolved price
         totalSpent: 0,
         totalReceived: 0,
         note: hash,
-        portfolioId: new mongoose.Types.ObjectId(portfolio._id),
-        chain: chainName,
-      });
-    }
+        portfolioId: portfolioId,
+        chainName: chainName,
+      };
+    });
+
+    // Execute all transaction lookups concurrently
+    const txs = (await Promise.all(txPromises)).filter((t) => t !== null);
 
     console.log(`📊 Prepared ${txs.length} transactions for DB insert`);
-
     if (txs.length) {
+      console.log("🧩 Sample tx:", JSON.stringify(txs[0], null, 2));
       const inserted = await Transaction.insertMany(txs, {
         ordered: false,
       }).catch((err) => {
-        console.warn("[insertMany] partial insert error:", err.message || err);
+        // Suppress 'duplicate key' errors which are expected in unordered insert
+        if (!err.message || !err.message.includes("duplicate key")) {
+          console.warn(
+            "[insertMany] partial insert error:",
+            err.message || err
+          );
+        }
         return err?.insertedDocs || [];
       });
       console.log(
@@ -833,8 +824,7 @@ exports.create = async (createDto, result = {}) => {
     return result;
   }
 };
-
-////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 
 exports.allAsset = async (byUserIdDto, result = {}) => {
   try {

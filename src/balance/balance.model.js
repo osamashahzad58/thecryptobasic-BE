@@ -23,6 +23,11 @@ const tokenSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  chainName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
   symbol: {
     type: String,
     required: true,
