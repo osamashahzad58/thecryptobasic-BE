@@ -22,5 +22,5 @@ exports.initRoutes = (app) => {
   app.use("/transaction", transactionRouter);
   app.use("/balance", balanceRouter);
   app.use("/portfolio", portfolioRouter);
-  app.use("/new", newsRouter);
+  app.use("/news", newsRouter);
 };
