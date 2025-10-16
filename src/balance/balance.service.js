@@ -31,6 +31,7 @@ const ARBISCAN_API_KEY = (process.env.ARBISCAN_API_KEY || "").trim();
 function chainHexToName(chain) {
   if (!chain) return "eth";
   const c = (chain + "").toLowerCase();
+  console.log(c, "ccccccc");
   if (c.startsWith("0x")) {
     const map = {
       "0x1": "eth",
@@ -46,6 +47,7 @@ function chainHexToName(chain) {
 
 function chainNameToEtherscanChainId(chainName) {
   const name = (chainName || "eth").toLowerCase();
+  console.log(name, "name:::::::::::::::50");
   const map = {
     eth: 1,
     ethereum: 1,
@@ -642,6 +644,7 @@ async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
     // 1. Check your Coin (CMC) table (most reliable and fast DB lookup)
     const coin = await Coin.findOne({
       "contracts.contract": addressLower,
+      symbol: symbol,
     });
 
     if (coin) {
@@ -687,13 +690,7 @@ async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
 exports.create = async (createDto, result = {}) => {
   try {
     console.log("🔥 [Balance.create] Incoming request:", createDto);
-    const {
-      walletAddress,
-      chain = "eth",
-      userId,
-      name,
-      isMe,
-    } = createDto || {};
+    const { walletAddress, chain, userId, name, isMe } = createDto || {};
 
     if (!walletAddress) throw new Error("walletAddress is required");
     if (!userId) throw new Error("userId is required");
