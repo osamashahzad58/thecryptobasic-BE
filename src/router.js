@@ -7,6 +7,7 @@ const watchListRouter = require("./watchlist/watchlist.router");
 const transactionRouter = require("./transaction/transaction.router");
 const balanceRouter = require("./balance/balance.router");
 const portfolioRouter = require("./portfolio/portfolio.router");
+const newsRouter = require("./news/news.reouter");
 
 const genrateOtp = require("./email-verification/email-verification.router");
 
@@ -21,4 +22,5 @@ exports.initRoutes = (app) => {
   app.use("/transaction", transactionRouter);
   app.use("/balance", balanceRouter);
   app.use("/portfolio", portfolioRouter);
+  app.use("/new", newsRouter);
 };

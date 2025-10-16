@@ -113,3 +113,23 @@ exports.getByBalance = async (req, res, next) => {
     next(ex);
   }
 };
+exports.stats = async (req, res, next) => {
+  try {
+    const statsDto = {
+      portfolioId: req.query?.portfolioId,
+      timeFilter: req.query?.timeFilter,
+      userId: req.user?.id,
+    };
+    const result = await balanceService.balanceStats(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User stats fetched successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};

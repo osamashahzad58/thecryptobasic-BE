@@ -1165,3 +1165,126 @@ exports.getByBalance = async ({ id }, result = {}) => {
     return result;
   }
 };
+exports.balanceStats = async (statsDto, result = {}) => {
+  try {
+    const { userId, timeFilter, portfolioId } = statsDto;
+    console.log(statsDto, "statsDto");
+    // 1. Get all balances for this user
+    const balances = await Balance.find({
+      userId: new mongoose.Types.ObjectId(userId),
+      portfolioId: new mongoose.Types.ObjectId(portfolioId),
+    });
+
+    if (!balances.length) {
+      result.data = {
+        totalValue: 0,
+        totalChange24h: 0,
+        totalChange24hPct: 0,
+        distribution: [],
+        topTokens: [],
+        assetsChart: [],
+        diversimeter: { hhi: 0, level: "None" },
+        portfolioHealth: { score: 0, label: "None" },
+      };
+      return result;
+    }
+
+    // 2. Flatten all tokens from all wallets
+    const tokens = balances.flatMap((wallet) => wallet.tokens || []);
+    if (!tokens.length) {
+      result.data = {
+        totalValue: 0,
+        totalChange24h: 0,
+        totalChange24hPct: 0,
+        distribution: [],
+        topTokens: [],
+        assetsChart: [],
+        diversimeter: { hhi: 0, level: "None" },
+        portfolioHealth: { score: 0, label: "None" },
+      };
+      return result;
+    }
+
+    // 3. Calculate totals
+    let totalValue = 0;
+    let totalChange24h = 0;
+    const distribution = [];
+
+    for (const token of tokens) {
+      const value = token.totalValueUSD || 0;
+      const change24h = value * ((token.percent_change_24h || 0) / 100);
+
+      totalValue += value;
+      totalChange24h += change24h;
+
+      distribution.push({
+        tokenAddress: token.tokenAddress,
+        coinId: token.coinId,
+        name: token.name,
+        symbol: token.symbol,
+        logo: token.logo,
+        value,
+        pct: 0,
+        percent_change_24h: token.percent_change_24h || 0,
+      });
+    }
+
+    // 4. Assign percentage share for each token
+    distribution.forEach((d) => {
+      d.pct = totalValue ? ((d.value / totalValue) * 100).toFixed(2) : 0;
+    });
+
+    // 5. Top 5 tokens by total value
+    const topTokens = [...distribution]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    // 6. Build assetsChart for last X days (default 7)
+    const days = timeFilter || 7;
+    const assetsChart = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      assetsChart.push({
+        dateOffsetDays: i,
+        value: totalValue, // placeholder (no historical yet)
+      });
+    }
+
+    // 7. Diversification index (HHI)
+    const hhi = distribution.reduce((acc, d) => acc + Math.pow(d.pct, 2), 0);
+    const diversimeter = {
+      hhi,
+      level: hhi < 1500 ? "Low Risk" : hhi < 3000 ? "Medium Risk" : "High Risk",
+    };
+
+    // 8. Portfolio health (simple scoring)
+    const portfolioHealth = {
+      score: Math.min(100, Math.round(totalValue / 1000)),
+      label:
+        totalValue < 50000 ? "Low" : totalValue < 100000 ? "Neutral" : "Good",
+    };
+
+    // 9. Calculate overall 24h change %
+    const totalChange24hPct = totalValue
+      ? (totalChange24h / (totalValue - totalChange24h)) * 100
+      : 0;
+
+    // 10. Final response
+    result.data = {
+      totalValue: Number(totalValue.toFixed(2)),
+      totalChange24h: Number(totalChange24h.toFixed(2)),
+      totalChange24hPct: Number(totalChange24hPct.toFixed(2)),
+      distribution,
+      topTokens,
+      assetsChart,
+      diversimeter,
+      portfolioHealth,
+    };
+  } catch (ex) {
+    console.error("[balanceStats] Error:", ex.message);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};

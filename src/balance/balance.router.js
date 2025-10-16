@@ -25,6 +25,12 @@ router.get(
 
   balanceController.allAsset
 );
+router.get(
+  "/stats",
+  [JWT.verifyAccessToken],
+  [validate(validation.stats, { keyByField: true })],
+  balanceController.stats
+);
 router.get("/:id", balanceController.getByBalance);
 
 module.exports = router;
