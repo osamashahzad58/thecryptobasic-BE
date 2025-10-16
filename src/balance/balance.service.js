@@ -731,18 +731,19 @@ exports.create = async (createDto, result = {}) => {
     // --- STEP 2: Handle Portfolio and Balance Doc ---
     // const portfolio = await findOrCreatePortfolio(walletAddress, userId);
     // Optimized: Try to find existing portfolio first
-    let portfolio = await Portfolio.findOne({
-      walletAddress: walletAddress,
-      userId: new mongoose.Types.ObjectId(userId),
-    });
+    // let portfolio;
+    // = await Portfolio.findOne({
+    //   walletAddress: walletAddress,
+    //   userId: new mongoose.Types.ObjectId(userId),
+    // });
 
-    if (portfolio) {
-      console.log("📁 Found existing portfolio:", portfolio._id);
-      return portfolio;
-    }
+    // if (portfolio) {
+    //   console.log("📁 Found existing portfolio:", portfolio._id);
+    //   return portfolio;
+    // }
 
     // Create if not found
-    portfolio = await Portfolio.create({
+    let portfolio = await Portfolio.create({
       walletAddress: walletAddress,
       isBlockchain: true,
       userId: new mongoose.Types.ObjectId(userId),
@@ -771,7 +772,7 @@ exports.create = async (createDto, result = {}) => {
       { upsert: true, new: true, setDefaultsOnInsert: true } // Options
     );
 
-    console.log("💾 [Balance] Wallet saved:", walletDoc.walletAddress);
+    console.log("💾 [Balance] Wallet saved:", walletDoc);
 
     // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
     console.log(`📦 Total transfers available: ${transfers.length}`);
