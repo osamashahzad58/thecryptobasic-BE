@@ -126,6 +126,7 @@ exports.chart = async (req, res, next) => {
     const statsDto = {
       userId: req.user?.id,
       timeFilter: req.query?.timeFilter,
+      portfolioId: req.query?.portfolioId,
     };
     const result = await transactionService.chart(statsDto);
 

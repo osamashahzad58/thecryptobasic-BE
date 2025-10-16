@@ -480,113 +480,247 @@ exports.stats = async (statsDto, result = {}) => {
   }
 };
 
+// exports.chart = async (chartDto, result = {}) => {
+//   try {
+//     const { userId, timeFilter, portfolioId } = chartDto;
+
+//     // 1. Get user's portfolios
+//     const portfolios = await Portfolio.find({
+//       userId: new mongoose.Types.ObjectId(userId),
+//     });
+
+//     if (!portfolios.length) {
+//       result.data = {
+//         totalValue: 0,
+//         totalChange24h: 0,
+//         totalChange24hPct: 0,
+//         assetsChart: [],
+//       };
+//       return result;
+//     }
+
+//     const portfolioIds = portfolios.map((p) => p._id);
+
+//     // 2. Filter transactions
+//     const filter = { portfolioId: { $in: portfolioIds } };
+
+//     if (timeFilter) {
+//       const startDate = new Date();
+//       startDate.setDate(startDate.getDate() - Number(timeFilter));
+//       filter.transactionTime = { $gte: startDate };
+//     }
+
+//     const transactions = await Transaction.find(filter);
+//     if (!transactions.length) {
+//       result.data = {
+//         totalValue: 0,
+//         totalChange24h: 0,
+//         totalChange24hPct: 0,
+//         assetsChart: [],
+//       };
+//       return result;
+//     }
+
+//     // 3. Aggregate per coin
+//     const holdings = {};
+//     const coinIds = new Set();
+
+//     transactions.forEach((tx) => {
+//       const coinId = tx.coinId;
+//       coinIds.add(coinId);
+//       let qty = holdings[coinId] || 0;
+//       if (tx.type === "buy") qty += tx.quantity;
+//       else if (tx.type === "sell") qty -= tx.quantity;
+//       else if (tx.type === "transfer") {
+//         if (tx.transferDirection === "in") qty += tx.quantity;
+//         else if (tx.transferDirection === "out") qty -= tx.quantity;
+//       }
+//       holdings[coinId] = qty;
+//     });
+
+//     const coins = await Coin.find({ coinId: { $in: Array.from(coinIds) } });
+
+//     // 4. Calculate total value + 24h change
+//     let totalValue = 0;
+//     let totalChange24h = 0;
+
+//     coins.forEach((coin) => {
+//       const qty = holdings[coin.coinId] || 0;
+//       const value = qty * (coin.price || 0);
+//       totalValue += value;
+//       totalChange24h += value * ((coin.percent_change_24h || 0) / 100);
+//     });
+
+//     const totalChange24hPct =
+//       totalValue > 0 ? (totalChange24h / totalValue) * 100 : 0;
+
+//     // 5. Build chart only for active transaction days
+//     const assetsChart = [];
+//     const groupedByDay = {};
+
+//     for (const tx of transactions) {
+//       const date = new Date(tx.transactionTime);
+//       const dateKey = date.toISOString().split("T")[0];
+//       if (!groupedByDay[dateKey]) groupedByDay[dateKey] = [];
+
+//       groupedByDay[dateKey].push(tx);
+//     }
+
+//     const coinMap = {};
+//     coins.forEach((c) => (coinMap[c.coinId] = c));
+
+//     for (const [date, txs] of Object.entries(groupedByDay)) {
+//       let dayValue = 0;
+//       for (const tx of txs) {
+//         const coin = coinMap[tx.coinId];
+//         if (!coin) continue;
+
+//         const qty = holdings[tx.coinId] || 0;
+//         dayValue += qty * (coin.price || 0);
+//       }
+
+//       assetsChart.push({
+//         date,
+//         value: Number(dayValue.toFixed(2)),
+//       });
+//     }
+
+//     // Sort chart by date ascending
+//     assetsChart.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+//     result.data = {
+//       totalValue: Number(totalValue.toFixed(2)),
+//       totalChange24h: Number(totalChange24h.toFixed(2)),
+//       totalChange24hPct: Number(totalChange24hPct.toFixed(2)),
+//       assetsChart,
+//     };
+//   } catch (ex) {
+//     console.error("[chart.service] Error:", ex.message);
+//     result.ex = ex.message;
+//   } finally {
+//     return result;
+//   }
+// };
 exports.chart = async (chartDto, result = {}) => {
   try {
-    const { userId, timeFilter } = chartDto;
+    const { userId, timeFilter, portfolioId } = chartDto || {};
 
-    // 1. Get user's portfolios
-    const portfolios = await Portfolio.find({
-      userId: new mongoose.Types.ObjectId(userId),
-    });
-
-    if (!portfolios.length) {
-      result.data = {
-        totalValue: 0,
-        totalChange24h: 0,
-        totalChange24hPct: 0,
-        assetsChart: [],
-      };
+    if (!userId) {
+      result.ex = "userId is required";
       return result;
     }
 
-    const portfolioIds = portfolios.map((p) => p._id);
-
-    // 2. Filter transactions
-    const filter = { portfolioId: { $in: portfolioIds } };
-
-    if (timeFilter) {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - Number(timeFilter));
-      filter.transactionTime = { $gte: startDate };
-    }
-
-    const transactions = await Transaction.find(filter);
-    if (!transactions.length) {
-      result.data = {
-        totalValue: 0,
-        totalChange24h: 0,
-        totalChange24hPct: 0,
-        assetsChart: [],
-      };
+    // Resolve ObjectId
+    let userOid;
+    try {
+      userOid = new mongoose.Types.ObjectId(userId);
+    } catch {
+      result.ex = "Invalid userId";
       return result;
     }
 
-    // 3. Aggregate per coin
-    const holdings = {};
-    const coinIds = new Set();
-
-    transactions.forEach((tx) => {
-      const coinId = tx.coinId;
-      coinIds.add(coinId);
-      let qty = holdings[coinId] || 0;
-      if (tx.type === "buy") qty += tx.quantity;
-      else if (tx.type === "sell") qty -= tx.quantity;
-      else if (tx.type === "transfer") {
-        if (tx.transferDirection === "in") qty += tx.quantity;
-        else if (tx.transferDirection === "out") qty -= tx.quantity;
+    // 1) Find single portfolio: requested -> isMe -> first
+    let portfolio = null;
+    if (portfolioId) {
+      try {
+        portfolio = await Portfolio.findOne({
+          _id: new mongoose.Types.ObjectId(portfolioId),
+          userId: userOid,
+        });
+      } catch (e) {
+        // ignore and try fallbacks
       }
-      holdings[coinId] = qty;
-    });
+    }
+    if (!portfolio)
+      portfolio = await Portfolio.findOne({ userId: userOid, isMe: true });
+    if (!portfolio) portfolio = await Portfolio.findOne({ userId: userOid });
 
-    const coins = await Coin.find({ coinId: { $in: Array.from(coinIds) } });
+    if (!portfolio) {
+      result.data = {
+        totalValue: 0,
+        totalChange24h: 0,
+        totalChange24hPct: 0,
+        assetsChart: [],
+      };
+      return result;
+    }
 
-    // 4. Calculate total value + 24h change
+    // 2) Load transactions for that single portfolio (optional time filter)
+    const txFilter = { portfolioId: portfolio._id };
+    if (timeFilter) {
+      const start = new Date();
+      start.setDate(start.getDate() - Number(timeFilter));
+      txFilter.transactionTime = { $gte: start };
+    }
+
+    const transactions = await Transaction.find(txFilter).lean();
+    if (!transactions || transactions.length === 0) {
+      result.data = {
+        totalValue: 0,
+        totalChange24h: 0,
+        totalChange24hPct: 0,
+        assetsChart: [],
+      };
+      return result;
+    }
+
+    // 3) Compute holdings per coinId
+    const holdings = {};
+    for (const tx of transactions) {
+      const cid = tx.coinId;
+      if (!cid) continue;
+      holdings[cid] = holdings[cid] || 0;
+
+      if (tx.type === "buy") holdings[cid] += tx.quantity;
+      else if (tx.type === "sell") holdings[cid] -= tx.quantity;
+      else if (
+        tx.type === "transfer" ||
+        tx.type === "receive" ||
+        tx.type === "send"
+      ) {
+        if (tx.transferDirection === "in") holdings[cid] += tx.quantity;
+        else if (tx.transferDirection === "out") holdings[cid] -= tx.quantity;
+      }
+    }
+
+    const coinIds = Object.keys(holdings);
+    if (coinIds.length === 0) {
+      result.data = {
+        totalValue: 0,
+        totalChange24h: 0,
+        totalChange24hPct: 0,
+        assetsChart: [],
+      };
+      return result;
+    }
+
+    // 4) Fetch coin prices and compute totals
+    const coins = await Coin.find({ coinId: { $in: coinIds } }).lean();
+
     let totalValue = 0;
     let totalChange24h = 0;
-
-    coins.forEach((coin) => {
-      const qty = holdings[coin.coinId] || 0;
-      const value = qty * (coin.price || 0);
-      totalValue += value;
-      totalChange24h += value * ((coin.percent_change_24h || 0) / 100);
-    });
-
-    const totalChange24hPct =
-      totalValue > 0 ? (totalChange24h / totalValue) * 100 : 0;
-
-    // 5. Build chart only for active transaction days
     const assetsChart = [];
-    const groupedByDay = {};
 
-    for (const tx of transactions) {
-      const date = new Date(tx.transactionTime);
-      const dateKey = date.toISOString().split("T")[0];
-      if (!groupedByDay[dateKey]) groupedByDay[dateKey] = [];
+    for (const c of coins) {
+      const qty = holdings[c.coinId] || 0;
+      const price = Number(c.price || 0);
+      const value = qty * price;
+      const change24 = value * ((c.percent_change_24h || 0) / 100);
 
-      groupedByDay[dateKey].push(tx);
-    }
-
-    const coinMap = {};
-    coins.forEach((c) => (coinMap[c.coinId] = c));
-
-    for (const [date, txs] of Object.entries(groupedByDay)) {
-      let dayValue = 0;
-      for (const tx of txs) {
-        const coin = coinMap[tx.coinId];
-        if (!coin) continue;
-
-        const qty = holdings[tx.coinId] || 0;
-        dayValue += qty * (coin.price || 0);
-      }
+      totalValue += value;
+      totalChange24h += change24;
 
       assetsChart.push({
-        date,
-        value: Number(dayValue.toFixed(2)),
+        coinId: c.coinId,
+        name: c.name,
+        symbol: c.symbol,
+        value: Number(value.toFixed(2)),
       });
     }
 
-    // Sort chart by date ascending
-    assetsChart.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const totalChange24hPct = totalValue
+      ? (totalChange24h / totalValue) * 100
+      : 0;
 
     result.data = {
       totalValue: Number(totalValue.toFixed(2)),
@@ -595,8 +729,8 @@ exports.chart = async (chartDto, result = {}) => {
       assetsChart,
     };
   } catch (ex) {
-    console.error("[chart.service] Error:", ex.message);
-    result.ex = ex.message;
+    console.error("[chart.service] Error:", ex);
+    result.ex = ex.message || ex;
   } finally {
     return result;
   }

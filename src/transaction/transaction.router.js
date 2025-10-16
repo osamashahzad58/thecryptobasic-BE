@@ -45,7 +45,7 @@ router.get(
 router.get(
   "/chart",
   [JWT.verifyAccessToken],
-  [validate(validation.stats, { keyByField: true })],
+  [validate(validation.chart, { keyByField: true })],
   transactionController.chart
 );
 router.get(

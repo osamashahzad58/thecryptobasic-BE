@@ -31,6 +31,12 @@ router.get(
   [validate(validation.stats, { keyByField: true })],
   balanceController.stats
 );
+router.get(
+  "/chart",
+  [JWT.verifyAccessToken],
+  [validate(validation.chart, { keyByField: true })],
+  balanceController.chart
+);
 router.get("/:id", balanceController.getByBalance);
 
 module.exports = router;

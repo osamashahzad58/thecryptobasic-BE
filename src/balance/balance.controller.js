@@ -126,7 +126,27 @@ exports.stats = async (req, res, next) => {
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
-      message: "User stats fetched successfully",
+      message: "User  wallet stats fetched successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.chart = async (req, res, next) => {
+  try {
+    const statsDto = {
+      userId: req.user?.id,
+      timeFilter: req.query?.timeFilter,
+      portfolioId: req.query?.portfolioId,
+    };
+    const result = await balanceService.chartBalance(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User chart successfully",
       data: result.data,
     });
   } catch (ex) {

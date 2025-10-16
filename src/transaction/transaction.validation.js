@@ -81,6 +81,12 @@ module.exports = {
       timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
     }),
   },
+  chart: {
+    query: Joi.object({
+      timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
   deleteAsset: {
     query: Joi.object({
       coinId: Joi.string().trim().required(),
