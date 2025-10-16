@@ -1082,7 +1082,7 @@ ${
     // Schedule recurring runs
     setInterval(() => {
       this.run();
-    }, CONFIG.posting.intervalMinutes * 60 * 1000);
+    }, CONFIG.posting.intervalMinutes * 30 * 1000);
   }
 }
 
