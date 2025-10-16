@@ -20,8 +20,6 @@ const tokenSchema = new mongoose.Schema({
   },
   icon: {
     type: String,
-    required: true,
-    trim: true,
   },
 
   symbol: {
