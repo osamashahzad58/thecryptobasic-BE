@@ -584,32 +584,32 @@ async function fetchTransfers(walletAddress, chain) {
 // ---------------------------
 // find or create portfolio (unchanged)
 // ---------------------------
-async function findOrCreatePortfolio(walletAddress, userId) {
-  const lower = walletAddress.toLowerCase();
+// async function findOrCreatePortfolio(walletAddress, userId) {
+//   const lower = walletAddress.toLowerCase();
 
-  // Optimized: Try to find existing portfolio first
-  let portfolio = await Portfolio.findOne({
-    walletAddress: lower,
-    userId: new mongoose.Types.ObjectId(userId),
-  });
+//   // Optimized: Try to find existing portfolio first
+//   let portfolio = await Portfolio.findOne({
+//     walletAddress: lower,
+//     userId: new mongoose.Types.ObjectId(userId),
+//   });
 
-  if (portfolio) {
-    console.log("📁 Found existing portfolio:", portfolio._id);
-    return portfolio;
-  }
+//   if (portfolio) {
+//     console.log("📁 Found existing portfolio:", portfolio._id);
+//     return portfolio;
+//   }
 
-  // Create if not found
-  portfolio = await Portfolio.create({
-    walletAddress: lower,
-    isBlockchain: true,
-    userId: new mongoose.Types.ObjectId(userId),
-    name: `Portfolio-${lower.slice(0, 6)}...`,
-    chainName: "eth",
-  });
-  console.log("📁 Created new portfolio:", portfolio);
+//   // Create if not found
+//   portfolio = await Portfolio.create({
+//     walletAddress: lower,
+//     isBlockchain: true,
+//     userId: new mongoose.Types.ObjectId(userId),
+//     name: name,
+//     chainName: "eth",
+//   });
+//   console.log("📁 Created new portfolio:", portfolio);
 
-  return portfolio;
-}
+//   return portfolio;
+// }
 
 // Helper to fetch metadata for a single transaction (used in exports.create)
 async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
@@ -712,8 +712,27 @@ exports.create = async (createDto, result = {}) => {
     }
 
     // --- STEP 2: Handle Portfolio and Balance Doc ---
-    const portfolio = await findOrCreatePortfolio(walletAddress, userId);
-    console.log("📁 Portfolio ID:", portfolio._id);
+    // const portfolio = await findOrCreatePortfolio(walletAddress, userId);
+    // Optimized: Try to find existing portfolio first
+    let portfolio = await Portfolio.findOne({
+      walletAddress: walletAddress,
+      userId: new mongoose.Types.ObjectId(userId),
+    });
+
+    if (portfolio) {
+      console.log("📁 Found existing portfolio:", portfolio._id);
+      return portfolio;
+    }
+
+    // Create if not found
+    portfolio = await Portfolio.create({
+      walletAddress: walletAddress,
+      isBlockchain: true,
+      userId: new mongoose.Types.ObjectId(userId),
+      name: name,
+      chainName: chainName,
+      isMe: typeof isMe === "boolean" ? isMe : false, // ✅ default false
+    });
 
     const updateData = {
       walletAddress: walletAddress.toLowerCase(),
@@ -921,7 +940,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
     // 1) fetch balances and portfolios (lean for performance)
-    const balances = await Balance.find({ userId: userObjectId }).lean();
+    // const balances = await Balance.find({ userId: userObjectId }).lean();
     const portfolios = await Portfolio.find({ userId: userObjectId }).lean();
 
     // prepare set of portfolio addresses (lowercased, non-empty)
@@ -1011,32 +1030,32 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
     }
 
     // 3) wallet entries from balances
-    const walletDataFromBalances = balances.map((w) => {
-      const totalValueUSD = (w.tokens || []).reduce(
-        (sum, t) => sum + (Number(t.totalValueUSD) || 0),
-        0
-      );
-      return {
-        _id: w._id,
-        name: w.name,
-        walletAddress: w.walletAddress || null,
-        isMe: w.isMe,
-        isBlockchain: w.isBlockchain,
-        userId: w.userId,
-        totalValueUSD: Number(totalValueUSD.toFixed(2)),
-        tokenCount: (w.tokens || []).length,
-        createdAt: w.createdAt,
-        updatedAt: w.updatedAt,
-        source: "balance",
-      };
-    });
+    // const walletDataFromBalances = balances.map((w) => {
+    //   const totalValueUSD = (w.tokens || []).reduce(
+    //     (sum, t) => sum + (Number(t.totalValueUSD) || 0),
+    //     0
+    //   );
+    //   return {
+    //     _id: w._id,
+    //     name: w.name,
+    //     walletAddress: w.walletAddress || null,
+    //     isMe: w.isMe,
+    //     isBlockchain: w.isBlockchain,
+    //     userId: w.userId,
+    //     totalValueUSD: Number(totalValueUSD.toFixed(2)),
+    //     tokenCount: (w.tokens || []).length,
+    //     createdAt: w.createdAt,
+    //     updatedAt: w.updatedAt,
+    //     source: "balance",
+    //   };
+    // });
 
     // 4) wallet entries from portfolios that don't duplicate balance addresses
-    const existingAddresses = new Set(
-      walletDataFromBalances
-        .map((w) => (w.walletAddress || "").toLowerCase())
-        .filter(Boolean)
-    );
+    // const existingAddresses = new Set(
+    //   walletDataFromBalances
+    //     .map((w) => (w.walletAddress || "").toLowerCase())
+    //     .filter(Boolean)
+    // );
     const walletDataFromPortfolios = portfolioData
       .map((p) => ({
         _id: p._id,
@@ -1056,7 +1075,7 @@ exports.getCombinePortfolio = async (getListDto, result = {}) => {
         return !a || !existingAddresses.has(a); // keep no-address portfolios; skip duplicate addresses
       });
 
-    const walletData = [...walletDataFromBalances, ...walletDataFromPortfolios];
+    const walletData = [...walletDataFromPortfolios];
 
     // 5) classification rules:
     // - explicit isMe true => myWallets
