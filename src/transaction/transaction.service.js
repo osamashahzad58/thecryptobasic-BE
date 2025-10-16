@@ -626,14 +626,18 @@ exports.chart = async (chartDto, result = {}) => {
         portfolio = await Portfolio.findOne({
           _id: new mongoose.Types.ObjectId(portfolioId),
           userId: userOid,
-        });
+        }).lean();
       } catch (e) {
         // ignore and try fallbacks
       }
     }
     if (!portfolio)
-      portfolio = await Portfolio.findOne({ userId: userOid, isMe: true });
-    if (!portfolio) portfolio = await Portfolio.findOne({ userId: userOid });
+      portfolio = await Portfolio.findOne({
+        userId: userOid,
+        isMe: true,
+      }).lean();
+    if (!portfolio)
+      portfolio = await Portfolio.findOne({ userId: userOid }).lean();
 
     if (!portfolio) {
       result.data = {
@@ -664,8 +668,10 @@ exports.chart = async (chartDto, result = {}) => {
       return result;
     }
 
-    // 3) Compute holdings per coinId
-    const holdings = {};
+    // 3) Compute holdings per coinId AND track latest transaction time per coin
+    const holdings = {}; // coinId -> qty
+    const latestTxTime = {}; // coinId -> ISO time string (latest)
+
     for (const tx of transactions) {
       const cid = tx.coinId;
       if (!cid) continue;
@@ -680,6 +686,22 @@ exports.chart = async (chartDto, result = {}) => {
       ) {
         if (tx.transferDirection === "in") holdings[cid] += tx.quantity;
         else if (tx.transferDirection === "out") holdings[cid] -= tx.quantity;
+      }
+
+      // record latest transaction time for this coin
+      try {
+        const txTime = tx.transactionTime ? new Date(tx.transactionTime) : null;
+        if (txTime && !Number.isNaN(txTime.getTime())) {
+          const iso = txTime.toISOString();
+          if (
+            !latestTxTime[cid] ||
+            new Date(iso) > new Date(latestTxTime[cid])
+          ) {
+            latestTxTime[cid] = iso;
+          }
+        }
+      } catch (e) {
+        // ignore invalid dates
       }
     }
 
@@ -701,8 +723,20 @@ exports.chart = async (chartDto, result = {}) => {
     let totalChange24h = 0;
     const assetsChart = [];
 
-    for (const c of coins) {
-      const qty = holdings[c.coinId] || 0;
+    // Build a map for quick lookup in case some coin documents are missing
+    const coinMap = {};
+    for (const c of coins) coinMap[c.coinId] = c;
+
+    // For coins that exist in holdings but not in Coin collection, include with zero price
+    for (const cid of coinIds) {
+      const c = coinMap[cid] || {
+        coinId: cid,
+        name: cid,
+        symbol: cid,
+        price: 0,
+        percent_change_24h: 0,
+      };
+      const qty = holdings[cid] || 0;
       const price = Number(c.price || 0);
       const value = qty * price;
       const change24 = value * ((c.percent_change_24h || 0) / 100);
@@ -715,8 +749,12 @@ exports.chart = async (chartDto, result = {}) => {
         name: c.name,
         symbol: c.symbol,
         value: Number(value.toFixed(2)),
+        time: latestTxTime[cid] || null, // ISO string or null
       });
     }
+
+    // Sort assetsChart by value descending for nicer output
+    assetsChart.sort((a, b) => b.value - a.value);
 
     const totalChange24hPct = totalValue
       ? (totalChange24h / totalValue) * 100
@@ -735,6 +773,7 @@ exports.chart = async (chartDto, result = {}) => {
     return result;
   }
 };
+
 exports.deleteAsset = async (statsDto, result = {}) => {
   try {
     const { userId, coinId, portfolioId } = statsDto;
