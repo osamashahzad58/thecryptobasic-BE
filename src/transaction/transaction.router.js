@@ -48,6 +48,12 @@ router.get(
   [validate(validation.stats, { keyByField: true })],
   transactionController.chart
 );
+router.get(
+  "/deleteAsset",
+  [JWT.verifyAccessToken],
+  [validate(validation.deleteAsset, { keyByField: true })],
+  transactionController.deleteAsset
+);
 router.put(
   "/:id",
   [JWT.verifyAccessToken],

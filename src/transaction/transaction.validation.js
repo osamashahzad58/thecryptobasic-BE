@@ -81,6 +81,12 @@ module.exports = {
       timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
     }),
   },
+  deleteAsset: {
+    query: Joi.object({
+      coinId: Joi.string().trim().required(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
   update: {
     body: Joi.object({
       type: Joi.string().valid("buy", "sell", "transfer").optional(),

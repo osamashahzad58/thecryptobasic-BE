@@ -140,6 +140,26 @@ exports.chart = async (req, res, next) => {
     next(ex);
   }
 };
+exports.deleteAsset = async (req, res, next) => {
+  try {
+    const statsDto = {
+      userId: req.user?.id,
+      coinId: req.query?.coinId,
+      portfolioId: req.query?.portfolioId,
+    };
+    const result = await transactionService.deleteAsset(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Delete Asset successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.update = async function (req, res, next) {
   try {
     const updateDto = {

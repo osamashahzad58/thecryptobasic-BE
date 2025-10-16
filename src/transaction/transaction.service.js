@@ -601,6 +601,44 @@ exports.chart = async (chartDto, result = {}) => {
     return result;
   }
 };
+exports.deleteAsset = async (statsDto, result = {}) => {
+  try {
+    const { userId, coinId, portfolioId } = statsDto;
+
+    // Validate input
+    if (!userId || !coinId || !portfolioId) {
+      throw new Error("userId, coinId, and portfolioId are required.");
+    }
+
+    // Build the delete filter
+    const filter = {
+      userId,
+      coinId,
+      portfolioId,
+    };
+
+    // Delete matching transaction(s)
+    const deleteResult = await Transaction.deleteMany(filter);
+
+    if (deleteResult.deletedCount === 0) {
+      result.data = {
+        deletedCount: 0,
+        message: "No matching assets found to delete.",
+      };
+    } else {
+      result.data = {
+        deletedCount: deleteResult.deletedCount,
+        message: `${deleteResult.deletedCount} asset(s) deleted successfully.`,
+      };
+    }
+  } catch (ex) {
+    console.error("[chart.service] deleteAsset Error:", ex);
+    result.ex = ex.message;
+  } finally {
+    return result;
+  }
+};
+
 exports.update = async (updateDto, result = {}) => {
   try {
     const { id, userId, ...updateFields } = updateDto;
