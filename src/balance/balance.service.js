@@ -1345,6 +1345,7 @@ exports.chartBalance = async (chartDto, result = {}) => {
       result.ex = "userId is required";
       return result;
     }
+
     const userOid = toObjectId(userId);
     if (!userOid) {
       result.ex = "Invalid userId";
@@ -1355,24 +1356,20 @@ exports.chartBalance = async (chartDto, result = {}) => {
     let portfolio = null;
     if (portfolioId) {
       const pOid = toObjectId(portfolioId);
-      if (pOid)
+      if (pOid) {
         portfolio = await Portfolio.findOne({
           _id: pOid,
           userId: userOid,
-          _id: new mongoose.Types.ObjectId(portfolioId),
         }).lean();
+      }
     }
     if (!portfolio)
       portfolio = await Portfolio.findOne({
         userId: userOid,
-        isBlockchain: true,
-        _id: new mongoose.Types.ObjectId(portfolioId),
+        isMe: true,
       }).lean();
     if (!portfolio)
-      portfolio = await Portfolio.findOne({
-        userId: userOid,
-        _id: new mongoose.Types.ObjectId(portfolioId),
-      }).lean();
+      portfolio = await Portfolio.findOne({ userId: userOid }).lean();
 
     if (!portfolio) {
       result.data = {
@@ -1383,10 +1380,12 @@ exports.chartBalance = async (chartDto, result = {}) => {
       };
       return result;
     }
+
     // 2) Fetch balances (wallets) for that portfolio (optionally filter by walletAddress)
     const balFilter = { userId: userOid, portfolioId: portfolio._id };
     if (walletAddress)
       balFilter.walletAddress = String(walletAddress).toLowerCase();
+
     const balances = await Balance.find(balFilter).lean();
     if (!balances || balances.length === 0) {
       result.data = {
@@ -1398,9 +1397,15 @@ exports.chartBalance = async (chartDto, result = {}) => {
       return result;
     }
 
-    // 3) Flatten tokens and aggregate by coinId -> symbol -> tokenAddress
-    const tokens = balances.flatMap((b) => b.tokens || []);
-    if (!tokens || tokens.length === 0) {
+    // 3) Flatten tokens and attach wallet updatedAt as fallback time
+    const tokensWithWalletTime = balances.flatMap((b) =>
+      (b.tokens || []).map((t) => ({
+        ...t,
+        _walletUpdatedAt: b.updatedAt || b.createdAt || null,
+      }))
+    );
+
+    if (!tokensWithWalletTime || tokensWithWalletTime.length === 0) {
       result.data = {
         totalValue: 0,
         totalChange24h: 0,
@@ -1410,14 +1415,32 @@ exports.chartBalance = async (chartDto, result = {}) => {
       return result;
     }
 
+    // 4) Aggregate tokens by coinId -> symbol -> tokenAddress and determine time
     const map = new Map();
-    for (const t of tokens) {
+    for (const t of tokensWithWalletTime) {
       const key = t.coinId || t.symbol || t.tokenAddress;
       const balanceNum = Number(t.balance || 0);
       const priceNum = Number(t.priceUSD || 0);
       const totalFromFields = Number(t.totalValueUSD ?? balanceNum * priceNum);
       const value = Number.isFinite(totalFromFields) ? totalFromFields : 0;
       const pct24 = Number(t.percent_change_24h || 0);
+
+      // Determine time: prefer token._id timestamp, otherwise wallet updatedAt fallback
+      let timeIso = null;
+      if (t._id && typeof t._id.getTimestamp === "function") {
+        try {
+          timeIso = t._id.getTimestamp().toISOString();
+        } catch (e) {
+          timeIso = null;
+        }
+      }
+      if (!timeIso && t._walletUpdatedAt) {
+        try {
+          timeIso = new Date(t._walletUpdatedAt).toISOString();
+        } catch (e) {
+          timeIso = null;
+        }
+      }
 
       if (!map.has(key)) {
         map.set(key, {
@@ -1426,6 +1449,7 @@ exports.chartBalance = async (chartDto, result = {}) => {
           symbol: t.symbol || null,
           value,
           percent_change_24h: pct24,
+          time: timeIso,
         });
       } else {
         const ex = map.get(key);
@@ -1435,13 +1459,19 @@ exports.chartBalance = async (chartDto, result = {}) => {
           ex.value > 0
             ? (ex.percent_change_24h * prev + pct24 * value) / ex.value
             : 0;
+
+        // Keep the earliest timestamp (change to latest by using > instead of <)
+        if (timeIso) {
+          if (!ex.time) ex.time = timeIso;
+          else if (new Date(timeIso) < new Date(ex.time)) ex.time = timeIso;
+        }
         map.set(key, ex);
       }
     }
 
     const distribution = Array.from(map.values());
 
-    // 4) Totals and formatting
+    // 5) Totals and formatting
     let totalValue = 0;
     let totalChange24h = 0;
     distribution.forEach((d) => {
@@ -1457,9 +1487,11 @@ exports.chartBalance = async (chartDto, result = {}) => {
       d.percent_change_24h = Number(
         Number(d.percent_change_24h || 0).toFixed(4)
       );
+      // keep time as ISO string or null
+      d.time = d.time || null;
     });
 
-    // 5) Build assetsChart (list of tokens with value; placeholder for historical)
+    // 6) Build assetsChart (sorted by value desc)
     const assetsChart = distribution
       .sort((a, b) => b.value - a.value)
       .map((d) => ({
@@ -1467,6 +1499,7 @@ exports.chartBalance = async (chartDto, result = {}) => {
         name: d.name,
         symbol: d.symbol,
         value: d.value,
+        time: d.time,
       }));
 
     const totalChange24hPct = totalValue
