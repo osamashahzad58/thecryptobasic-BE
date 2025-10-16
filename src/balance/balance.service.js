@@ -725,14 +725,20 @@ exports.create = async (createDto, result = {}) => {
       chainName: chainName,
       isBlockchain: true,
     };
+    const walletLower = walletAddress.toLowerCase();
 
-    const walletDoc = await Balance.create(updateData);
+    // const walletDoc = await Balance.create(updateData);
+
+    const walletDoc = await Balance.findOneAndUpdate(
+      { walletAddress: walletLower, userId }, // Query filter
+      { $set: updateData }, // Update operation
+      { upsert: true, new: true, setDefaultsOnInsert: true } // Options
+    );
 
     console.log("💾 [Balance] Wallet saved:", walletDoc.walletAddress);
 
     // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
     console.log(`📦 Total transfers available: ${transfers.length}`);
-    const walletLower = walletAddress.toLowerCase();
     const chainId = new mongoose.Types.ObjectId(userId);
     const portfolioId = new mongoose.Types.ObjectId(portfolio._id);
     let address;

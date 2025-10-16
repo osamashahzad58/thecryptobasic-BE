@@ -109,5 +109,6 @@ const balanceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+balanceSchema.index({ userId: 1, walletAddress: 1 }, { unique: true });
 
 module.exports = mongoose.model("Balance", balanceSchema);
