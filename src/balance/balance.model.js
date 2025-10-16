@@ -18,7 +18,8 @@ const tokenSchema = new mongoose.Schema({
     trim: true,
     index: true,
   },
-  icon: {
+
+  logo: {
     type: String,
   },
 
@@ -97,6 +98,10 @@ const balanceSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
+    },
+    chainName: {
+      type: String,
+      trim: true,
     },
     url: {
       type: String,

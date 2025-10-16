@@ -169,7 +169,7 @@ async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
   let percent_change_1h = 0;
   let percent_change_24h = 0;
   let percent_change_7d = 0;
-  let icon = "";
+  let logo = "";
   let coinId = null;
 
   try {
@@ -182,7 +182,7 @@ async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
     if (coin) {
       name = coin.name || name;
       symbol = coin.symbol || symbol;
-      icon = coin.logo || "";
+      logo = coin.logo || "";
       coinId = coin.coinId || null;
       priceUSD = Number(coin.price || priceUSD || 0);
       percent_change_1h = Number(coin.percent_change_1h || 0);
@@ -201,7 +201,7 @@ async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
           // Dexscreener gives priceChange.h1, h24. No h7d.
           percent_change_1h = Number(pair.priceChange?.h1 || 0);
           percent_change_24h = Number(pair.priceChange?.h24 || 0);
-          icon = pair.info?.imageUrl || "";
+          logo = pair.info?.imageUrl || "";
         }
       } catch (dsErr) {
         // console.warn(`[Dexscreener] error for ${tokenAddr}:`, dsErr.message);
@@ -214,7 +214,7 @@ async function fetchTokenMetadata(tokenAddr, defaultSymbol) {
   return {
     name,
     symbol,
-    icon,
+    logo,
     coinId,
     priceUSD,
     percent_change_1h,
@@ -291,7 +291,7 @@ async function getWalletTokensMoralis(walletAddress, chain) {
         coinId: meta.coinId,
         name: meta.name || t.name || t.token_name || "",
         symbol: meta.symbol,
-        icon: meta.icon,
+        logo: meta.logo,
         balance: isFinite(balance) ? balance : 0,
         priceUSD: meta.priceUSD,
         totalValueUSD,
@@ -480,7 +480,7 @@ async function deriveTokenBalancesFromTransfers(transfers, walletLower) {
       coinId: meta.coinId,
       name: meta.name,
       symbol: v.symbol,
-      icon: meta.icon,
+      logo: meta.logo,
       balance: quantity,
       priceUSD: meta.priceUSD,
       totalValueUSD,
@@ -613,7 +613,7 @@ async function fetchTransfers(walletAddress, chain) {
 
 // Helper to fetch metadata for a single transaction (used in exports.create)
 async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
-  let tokenMeta = { name: symbol, symbol: symbol, icon: "", priceUSD: 0 };
+  let tokenMeta = { name: symbol, symbol: symbol, logo: "", priceUSD: 0 };
   const addressLower = tokenAddress?.toLowerCase();
 
   if (!addressLower) {
@@ -630,7 +630,7 @@ async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
     if (coin) {
       tokenMeta.name = coin.name || symbol;
       tokenMeta.symbol = coin.symbol || symbol;
-      tokenMeta.icon = coin.logo || "";
+      tokenMeta.logo = coin.logo || "";
       tokenMeta.priceUSD = coin.price || 0;
     } else {
       // 2. Fallback: Dexscreener API (external API call)
@@ -642,7 +642,7 @@ async function getTransactionTokenMeta(tokenAddress, symbol, chainName) {
           const pair = data.pairs[0];
           tokenMeta.name = pair.baseToken?.name || symbol;
           tokenMeta.symbol = pair.baseToken?.symbol || symbol;
-          tokenMeta.icon = pair.info?.imageUrl || "";
+          tokenMeta.logo = pair.info?.imageUrl || "";
           tokenMeta.priceUSD = parseFloat(pair.priceUsd) || 0;
         }
       } catch (e) {
@@ -795,7 +795,7 @@ exports.create = async (createDto, result = {}) => {
         coinId: tokenMeta.symbol, // Use the resolved symbol
         name: tokenMeta.name,
         symbol: tokenMeta.symbol,
-        icon: tokenMeta.icon,
+        logo: tokenMeta.logo,
         type: "transfer",
         transferDirection: direction,
         transactionTime: new Date(
