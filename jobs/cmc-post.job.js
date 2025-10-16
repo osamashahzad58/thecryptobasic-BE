@@ -42,7 +42,7 @@ const CONFIG = {
     pairUrl: "https://api.dexscreener.com/latest/dex/tokens/",
   },
   posting: {
-    intervalMinutes: 30, // Check for new tokens every 30 minutes
+    intervalMinutes: 15, // Check for new tokens every 30 minutes
     postsPerRun: 5, // Maximum posts per run
   },
 };
@@ -1082,7 +1082,7 @@ ${
     // Schedule recurring runs
     setInterval(() => {
       this.run();
-    }, CONFIG.posting.intervalMinutes * 30 * 1000);
+    }, CONFIG.posting.intervalMinutes * 60 * 1000);
   }
 }
 
