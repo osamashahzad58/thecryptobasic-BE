@@ -18,7 +18,9 @@ const API_KEY_MORALIS = (
 const ETHERSCAN_API_KEY = (
   process.env.ETHERSCAN_API_KEY || "SCQ7RNBKAFWSB1VRRKA2FM8E2C6MAZFUFZ"
 ).trim();
-const BSCSCAN_API_KEY = (process.env.BSCSCAN_API_KEY || "").trim();
+const BSCSCAN_API_KEY = (
+  process.env.ETHERSCAN_API_KEY || "SCQ7RNBKAFWSB1VRRKA2FM8E2C6MAZFUFZ"
+).trim();
 const POLYGONSCAN_API_KEY = (process.env.POLYGONSCAN_API_KEY || "").trim();
 const SNOWTRACE_API_KEY = (process.env.SNOWTRACE_API_KEY || "").trim();
 const ARBISCAN_API_KEY = (process.env.ARBISCAN_API_KEY || "").trim();
@@ -66,25 +68,40 @@ const EXPLORER_CONFIG = {
     apiKey: ETHERSCAN_API_KEY,
     chainid: 1,
   },
+  // bsc: {
+  //   provider: "bscscan",
+  //   base: "https://api.bscscan.com/api",
+  //   apiKey: BSCSCAN_API_KEY || ETHERSCAN_API_KEY,
+  // },
   bsc: {
-    provider: "bscscan",
-    base: "https://api.bscscan.com/api",
-    apiKey: BSCSCAN_API_KEY || ETHERSCAN_API_KEY,
+    provider: "etherscan",
+    v2Base: "https://api.etherscan.io/v2/api",
+    v1Base: "https://api.etherscan.io/api",
+    apiKey: ETHERSCAN_API_KEY,
+    chainid: 56,
   },
+
+  // polygon: {
+  //   provider: "polygonscan",
+  //   base: "https://api.polygonscan.com/api",
+  //   apiKey: POLYGONSCAN_API_KEY || ETHERSCAN_API_KEY,
+  // },
   polygon: {
-    provider: "polygonscan",
-    base: "https://api.polygonscan.com/api",
-    apiKey: POLYGONSCAN_API_KEY || ETHERSCAN_API_KEY,
+    provider: "etherscan",
+    v2Base: "https://api.etherscan.io/v2/api",
+    v1Base: "https://api.etherscan.io/api",
+    apiKey: ETHERSCAN_API_KEY,
+    chainid: 80001,
   },
   avax: {
     provider: "snowtrace",
-    base: "https://api.snowtrace.io/api",
+    base: "https://api.etherscan.io/v2/api",
     apiKey: SNOWTRACE_API_KEY || ETHERSCAN_API_KEY,
     chainid: 43114,
   },
   arbitrum: {
     provider: "arbiscan",
-    base: "https://api.arbiscan.io/api",
+    base: "https://api.etherscan.io/v2/api",
     apiKey: ARBISCAN_API_KEY || ETHERSCAN_API_KEY,
     chainid: 42161,
   },
