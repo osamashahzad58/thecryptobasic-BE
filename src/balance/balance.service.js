@@ -1222,7 +1222,7 @@ exports.balanceStats = async (statsDto, result = {}) => {
         totalChange24h: 0,
         totalChange24hPct: 0,
         distribution: [],
-        topTokens: [],
+        topToken: [],
         assetsChart: [],
         diversimeter: { hhi: 0, level: "None" },
         portfolioHealth: { score: 0, label: "None" },
@@ -1238,7 +1238,7 @@ exports.balanceStats = async (statsDto, result = {}) => {
         totalChange24h: 0,
         totalChange24hPct: 0,
         distribution: [],
-        topTokens: [],
+        topToken: [],
         assetsChart: [],
         diversimeter: { hhi: 0, level: "None" },
         portfolioHealth: { score: 0, label: "None" },
@@ -1304,7 +1304,7 @@ exports.balanceStats = async (statsDto, result = {}) => {
       );
     });
 
-    const topTokens = [...distribution]
+    const topToken = [...distribution]
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
@@ -1340,7 +1340,7 @@ exports.balanceStats = async (statsDto, result = {}) => {
       totalChange24h: Number(totalChange24h.toFixed(2)),
       totalChange24hPct: Number(totalChange24hPct.toFixed(2)),
       distribution,
-      topTokens,
+      topToken,
       assetsChart,
       diversimeter,
       portfolioHealth,
