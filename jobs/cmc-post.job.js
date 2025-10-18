@@ -896,10 +896,27 @@ ${
       // Generate image locally
       console.log(`🎨 Creating local image for Unicode text`);
       //const imageBuffer = await this.generateImageWithUnicodeText(text);
-      const info = {
-        coinSymbol: text,
-        coinName: name,
+      // const info = {
+      //   coinSymbol: text,
+      //   coinName: name,
+      // };
+      // const imageBuffer = await generateCoinImage(info);
+      // Helper: Capitalize only English (Latin) text
+      const capitalize = (str) => {
+        if (!str) return str;
+        const isLatin = /^[A-Za-z]/.test(str);
+        if (isLatin) {
+          return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+        }
+        return str;
       };
+
+      // Apply it here
+      const info = {
+        coinSymbol: capitalize(text),
+        coinName: capitalize(name),
+      };
+
       const imageBuffer = await generateCoinImage(info);
 
       // Upload to WordPress
