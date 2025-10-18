@@ -567,7 +567,6 @@ async function generateCoinImage(opts = {}) {
   ctx.fillText(config.watermark, W - 30 * S, H - 28 * S);
   ctx.restore();
 
-  // return buffer
   return config.format === "webp"
     ? canvas.toBuffer("image/webp", { quality: 0.9 })
     : canvas.toBuffer("image/png");
