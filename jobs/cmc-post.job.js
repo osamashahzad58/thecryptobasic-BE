@@ -4,6 +4,7 @@ const fs = require("fs");
 const sharp = require("sharp");
 const { createCanvas, registerFont } = require("canvas");
 const path = require("path");
+const generateCoinImage = require("../1");
 
 // English font
 registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
@@ -857,7 +858,7 @@ ${
     return canvas.toBuffer("image/png");
   }
 
-  async uploadFeaturedImage(tokenSymbol) {
+  async uploadFeaturedImage(tokenSymbol, name) {
     const text = (tokenSymbol || "Crypto").trim();
 
     console.log(`🖼️ Generating image for: ${text}`);
@@ -883,7 +884,12 @@ ${
 
       // Generate image locally
       console.log(`🎨 Creating local image for Unicode text`);
-      const imageBuffer = await this.generateImageWithUnicodeText(text);
+      //const imageBuffer = await this.generateImageWithUnicodeText(text);
+      const info = {
+        coinSymbol: text,
+        coinName: name,
+      };
+      const imageBuffer = await generateCoinImage(info);
 
       // Upload to WordPress
       const hash = require("crypto")
@@ -954,7 +960,8 @@ ${
 
     // Always use placeholder image
     const featuredImage = await this.uploadFeaturedImage(
-      pairData.baseToken.symbol
+      pairData.baseToken.symbol,
+      pairData.baseToken.name
     );
 
     console.log("featuredImage", featuredImage);
