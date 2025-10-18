@@ -893,7 +893,7 @@ ${
         return { id: match.id, url: match.source_url, alt: text };
       }
 
-      // Generate image locally
+      // Generate image locall
       console.log(`🎨 Creating local image for Unicode text`);
       //const imageBuffer = await this.generateImageWithUnicodeText(text);
       // const info = {
