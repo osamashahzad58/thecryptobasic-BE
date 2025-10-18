@@ -3,116 +3,162 @@ const axios = require("axios");
 const configs = require("../configs");
 const CmcCoins = require("../src/cmc-coins/models/cmc-coins.model");
 
-let batchSize;
+// ===============================
+// CONFIG
+// ===============================
+const CMC_API_BASE =
+  "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest";
+const CRON_SCHEDULE = configs.coinMarketCap?.cronSchedule || "*/60 * * * * *"; // every 30 sec
+const REQUEST_TIMEOUT = configs.coinMarketCap?.timeoutMs || 30000;
+const MAX_IDS_PER_REQUEST = 1000; // CMC limit per quotes/latest call
+const BULK_CHUNK_SIZE = 1000; // Mongo bulk write chunk size
 
-// 🔹 Fetch a batch of listings from CoinMarketCap
-async function fetchListingsBatch(start = 1, batchSize) {
-  const params = {
-    start: start.toString(),
-    limit: batchSize.toString(),
-    convert: "USD",
-  };
-
-  console.log("Fetching CMC batch with params:", params);
-
-  const res = await axios.get(
-    "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
-    {
-      params: params,
-      headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
-      timeout: 30000,
-    }
-  );
-
-  return res.data?.data || [];
+// ===============================
+// HELPERS
+// ===============================
+function sleep(ms) {
+  return new Promise((res) => setTimeout(res, ms));
 }
 
-// 🔹 Fetch and update prices
+function chunkArray(arr, size) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// ===============================
+// MAIN FUNCTION
+// ===============================
 async function fetchCMCPrice() {
   try {
-    console.log("--- Updating CMC Data ---");
+    console.log("\n--- Start: Updating CMC Data ---");
 
-    // 1) Total coins from DB
-    const totalCoins = await CmcCoins.countDocuments();
+    const allCoins = await CmcCoins.find({}, { coinId: 1 }).lean();
+    const coinIds = allCoins.map((c) => String(c.coinId));
+    const totalCoins = coinIds.length;
 
-    // 2) Decide BATCH_SIZE
-    let BATCH_SIZE;
-    if (totalCoins > 1000) {
-      BATCH_SIZE = Math.ceil(totalCoins / 4); // divide into 4 batches
-    } else {
-      BATCH_SIZE = totalCoins; // if <1000, take all
+    if (!totalCoins) {
+      console.log("No coins found in DB.");
+      return;
     }
 
-    console.log(`Total coins in DB: ${totalCoins}, Batch size: ${BATCH_SIZE}`);
+    console.log(`Total coins in DB: ${totalCoins}`);
 
-    let start = 1;
+    const idChunks = chunkArray(coinIds, MAX_IDS_PER_REQUEST);
     let totalUpdated = 0;
-    let batchNumber = 1;
+    let batchNum = 1;
 
-    // 3) Loop until totalCoins are covered
-    while (start <= totalCoins) {
-      const coins = await fetchListingsBatch(start, BATCH_SIZE);
-      if (!coins.length) break;
+    for (const chunk of idChunks) {
+      try {
+        const params = {
+          id: chunk.join(","),
+          convert: "USD",
+        };
 
-      // Prepare updates only for existing DB coins
-      const updates = await Promise.all(
-        coins.map(async (coin) => {
-          const exists = await CmcCoins.exists({ coinId: coin.id.toString() });
-          if (!exists) return null;
+        const res = await axios.get(CMC_API_BASE, {
+          params,
+          headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
+          timeout: REQUEST_TIMEOUT,
+        });
 
+        const data = res.data?.data || {};
+        const coins = Object.values(data);
+
+        if (!coins.length) {
+          console.log(`⚠️ Batch ${batchNum}: No data returned for these IDs`);
+          batchNum++;
+          continue;
+        }
+
+        const updates = coins.map((coin) => {
+          const usd = coin.quote?.USD || {};
           return {
             updateOne: {
-              filter: { coinId: coin.id.toString() },
+              filter: { coinId: String(coin.id) },
               update: {
                 $set: {
-                  price: coin.quote?.USD?.price?.toString() || null,
-                  volume_24h: coin.quote?.USD?.volume_24h?.toString() || null,
+                  price: usd.price != null ? String(usd.price) : null,
+                  volume_24h:
+                    usd.volume_24h != null ? String(usd.volume_24h) : null,
                   volume_change_24h:
-                    coin.quote?.USD?.volume_change_24h?.toString() || null,
+                    usd.volume_change_24h != null
+                      ? String(usd.volume_change_24h)
+                      : null,
                   percent_change_1h:
-                    coin.quote?.USD?.percent_change_1h?.toString() || null,
+                    usd.percent_change_1h != null
+                      ? String(usd.percent_change_1h)
+                      : null,
                   percent_change_24h:
-                    coin.quote?.USD?.percent_change_24h?.toString() || null,
+                    usd.percent_change_24h != null
+                      ? String(usd.percent_change_24h)
+                      : null,
                   percent_change_7d:
-                    coin.quote?.USD?.percent_change_7d?.toString() || null,
-                  market_cap: coin.quote?.USD?.market_cap?.toString() || null,
+                    usd.percent_change_7d != null
+                      ? String(usd.percent_change_7d)
+                      : null,
+                  market_cap:
+                    usd.market_cap != null ? String(usd.market_cap) : null,
+                  last_updated: coin.last_updated || new Date().toISOString(),
                 },
               },
               upsert: false,
             },
           };
-        })
-      );
-
-      const validUpdates = updates.filter(Boolean);
-
-      if (validUpdates.length) {
-        const result = await CmcCoins.bulkWrite(validUpdates, {
-          ordered: false,
         });
-        totalUpdated += result.modifiedCount;
-        console.log(
-          `✅ Batch ${batchNumber}: start=${start}, updated ${result.modifiedCount} coins`
-        );
-      } else {
-        console.log(
-          `⚠️ Batch ${batchNumber}: start=${start}, no coins to update`
-        );
+
+        const updateChunks = chunkArray(updates, BULK_CHUNK_SIZE);
+
+        for (const [i, chunkOps] of updateChunks.entries()) {
+          const result = await CmcCoins.bulkWrite(chunkOps, { ordered: false });
+          const modified = result.modifiedCount ?? 0;
+          totalUpdated += modified;
+
+          console.log(
+            `✅ Batch ${batchNum} (chunk ${i + 1}/${
+              updateChunks.length
+            }): updated ${modified} coins`
+          );
+        }
+      } catch (err) {
+        console.error(`❌ Error in batch ${batchNum}:`, err.message);
+        if (err.response?.data) console.error(err.response.data);
       }
 
-      start += BATCH_SIZE; // move to next batch
-      batchNumber++;
+      batchNum++;
+      await sleep(1000); // avoid API rate limit
     }
 
-    console.log("--- CMC Data Update Complete ---");
-    console.log(`💾 Total coins updated in DB: ${totalUpdated}`);
+    console.log(
+      `--- Update Complete. Total coins updated: ${totalUpdated}/${totalCoins} ---`
+    );
   } catch (err) {
-    console.error("❌ Error updating CMC data:", err.message);
-    if (err.response) console.error(err.response.data);
+    console.error("❌ Fatal error in fetchCMCPrice:", err.message);
+    if (err.response?.data) console.error(err.response.data);
   }
 }
 
-// 🔹 Initialize cron job
+// ===============================
+// CRON JOB SETUP
+// ===============================
+let jobInstance = null;
+
 exports.initializeJob = () => {
-  // const job = new CronJob("*/20 * * * * *", fetchCMCPrice, null, true);
+  if (jobInstance) {
+    console.log("CMC job already running.");
+    return jobInstance;
+  }
+
+  jobInstance = new CronJob(CRON_SCHEDULE, fetchCMCPrice, null, true);
+  console.log(`Initialized CMC job with cron schedule: "${CRON_SCHEDULE}"`);
+  return jobInstance;
+};
+
+exports.shutdownJob = async () => {
+  if (jobInstance) {
+    jobInstance.stop();
+    console.log("CMC cron job stopped.");
+    jobInstance = null;
+  }
 };
