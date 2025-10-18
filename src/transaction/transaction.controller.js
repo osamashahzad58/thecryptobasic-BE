@@ -1,6 +1,7 @@
 const { StatusCodes } = require("http-status-codes");
 const createError = require("http-errors");
 const transactionService = require("./transaction.service");
+const Portfolio = require("../portfolio/portfolio.model");
 
 exports.create = async function (req, res, next) {
   try {
@@ -15,6 +16,8 @@ exports.create = async function (req, res, next) {
 
     if (result.hasConflict)
       throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+    if (result.nftNotFound)
+      throw createError(StatusCodes.NOT_FOUND, "portfolio not found");
 
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
@@ -29,8 +32,10 @@ exports.byUserId = async function (req, res, next) {
   try {
     const byUserIdDto = {
       userId: req.user?.id,
+      limit: req.query?.limit,
+      offset: req.query?.offset,
     };
-
+    console.log(byUserIdDto, "byUserIdDto::::::::::::::::::::;");
     const result = await transactionService.byUserId(byUserIdDto);
 
     if (result.ex) throw result.ex;
@@ -41,6 +46,160 @@ exports.byUserId = async function (req, res, next) {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Transaction by User successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.allAsset = async function (req, res, next) {
+  try {
+    const byUserIdDto = {
+      userId: req.user?.id,
+      limit: req.query?.limit,
+      offset: req.query?.offset,
+    };
+
+    const result = await transactionService.allAsset(byUserIdDto);
+
+    if (result.ex) throw result.ex;
+
+    if (result.hasConflict)
+      throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction by User successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.allAssetWithPortfolio = async function (req, res, next) {
+  try {
+    const byUserIdDto = {
+      // userId: req.user?.id,
+      limit: req.query?.limit,
+      offset: req.query?.offset,
+      portfolioId: req.query?.portfolioId,
+    };
+    console.log(byUserIdDto, "byUserIdDto");
+    const result = await transactionService.allAssetWithPortfolio(byUserIdDto);
+
+    if (result.ex) throw result.ex;
+
+    if (result.hasConflict)
+      throw createError(StatusCodes.CONFLICT, result.conflictMessage);
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction by User successfully",
+      data: result.data,
+      total: result.total,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.stats = async (req, res, next) => {
+  try {
+    const statsDto = {
+      userId: req.user?.id,
+      timeFilter: req.query?.timeFilter,
+    };
+    const result = await transactionService.stats(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User stats fetched successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.chart = async (req, res, next) => {
+  try {
+    const statsDto = {
+      userId: req.user?.id,
+      timeFilter: req.query?.timeFilter,
+      portfolioId: req.query?.portfolioId,
+    };
+    const result = await transactionService.chart(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "User chart successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.deleteAsset = async (req, res, next) => {
+  try {
+    const statsDto = {
+      userId: req.user?.id,
+      coinId: req.query?.coinId,
+      portfolioId: req.query?.portfolioId,
+    };
+    const result = await transactionService.deleteAsset(statsDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Delete Asset successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.update = async function (req, res, next) {
+  try {
+    const updateDto = {
+      id: req.params.id,
+      userId: req.user?.id,
+      ...req.body,
+    };
+
+    const result = await transactionService.update(updateDto);
+
+    if (result.ex) throw result.ex;
+    if (!result.data)
+      throw createError(StatusCodes.NOT_FOUND, "Transaction not found");
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction updated successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.delete = async function (req, res, next) {
+  try {
+    const deleteDto = {
+      id: req.params.id,
+      userId: req.user?.id,
+    };
+
+    const result = await transactionService.delete(deleteDto);
+
+    if (result.ex) throw result.ex;
+    if (!result.data)
+      throw createError(StatusCodes.NOT_FOUND, "Transaction not found");
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Transaction delete successfully",
       data: result.data,
     });
   } catch (ex) {

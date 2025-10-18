@@ -1,5 +1,8 @@
 const Joi = require("joi");
 Joi.objectId = require("joi-objectid")(Joi);
+const { joiPasswordExtendCore } = require("joi-password");
+const joiPassword = Joi.extend(joiPasswordExtendCore);
+const configs = require("../../configs");
 
 module.exports = {
   profile: {
@@ -26,196 +29,47 @@ module.exports = {
       id: Joi.objectId().required(),
     }),
   },
-  getByStatus: {
-    query: Joi.object({
-      limit: Joi.number().positive().required(),
-      offset: Joi.number().required(),
-      status: Joi.string().valid("pending", "completed", "answered").required(),
-      questionType: Joi.string()
-        .valid("data_request", "survey", "external_resource", "dispute")
-        .required(),
-      isVoted: Joi.boolean().optional(),
-      search: Joi.string().trim().optional(),
-      title: Joi.string().trim().optional(),
-      question: Joi.string().trim().optional(),
-      orderField: Joi.string()
-        .valid(
-          "email",
-          "createdAt",
-          "updatedAt",
-          "start_Date_UTC",
-          "_id",
-          "questionInstance_totalRewardAmount",
-          "title",
-          "question",
-          "blockNumber",
-          "dealSize",
-          "limit",
-          "questionInstance_rewardPerOracle",
-          "end_Date_UTC"
-        )
-        .required(),
-      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
-        is: Joi.exist(),
-        then: Joi.required(),
-      }),
-    }),
-  },
-  myRewards: {
-    query: Joi.object({
-      limit: Joi.number().positive().required(),
-      offset: Joi.number().positive().required(),
-      questionType: Joi.string()
-        .valid("data_request", "survey", "external_resource", "dispute")
-        .required(),
-      search: Joi.string().trim().optional(),
-      isClaim: Joi.boolean().optional(),
-      title: Joi.string().trim().optional(),
-      question: Joi.string().trim().optional(),
-      orderField: Joi.string()
-        .valid(
-          "email",
-          "createdAt",
-          "updatedAt",
-          "start_Date_UTC",
-          "_id",
-          "questionInstance_totalRewardAmount",
-          "title",
-          "question",
-          "blockNumber",
-          "dealSize",
-          "limit",
-          "questionInstance_rewardPerOracle",
-          "end_Date_UTC"
-        )
-        .required(),
-      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
-        is: Joi.exist(),
-        then: Joi.required(),
-      }),
-    }),
-  },
-  getQuestionByCreator: {
-    query: Joi.object({
-      limit: Joi.number().positive().required(),
-      offset: Joi.number().positive().required(),
-      // status: Joi.string().valid("pending", "completed", "answered").required(),
-      questionType: Joi.string()
-        .valid("data_request", "survey", "external_resource", "dispute")
-        .required(),
-      isVoted: Joi.boolean().optional(),
-      search: Joi.string().trim().optional(),
-      title: Joi.string().trim().optional(),
-      question: Joi.string().trim().optional(),
-      orderField: Joi.string()
-        .valid(
-          "email",
-          "createdAt",
-          "updatedAt",
-          "start_Date_UTC",
-          "_id",
-          "questionInstance_totalRewardAmount",
-          "title",
-          "question",
-          "blockNumber",
-          "dealSize",
-          "limit",
-          "questionInstance_rewardPerOracle"
-        )
-        .required(),
-      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
-        is: Joi.exist(),
-        then: Joi.required(),
-      }),
-    }),
-  },
-  getCountry: {
-    query: Joi.object({
-      nationality: Joi.string().required(),
-    }),
-  },
-  getGender: {
-    query: Joi.object({
-      gender: Joi.string().required(),
-    }),
-  },
-  byAddress: {
-    query: Joi.object({
-      walletAddress: Joi.string().required(),
-    }),
-  },
-  getAge: {
-    query: Joi.object({
-      age: Joi.string()
-        .valid(
-          "20-25",
-          "25-30",
-          "30-35",
-          "35-40",
-          "40-45",
-          "45-50",
-          "50-55",
-          "55-60",
-          "60+"
-        )
-        .required()
-        .messages({
-          "any.only":
-            "Invalid age group. Allowed values: '20-25', '25-30', '30-35', etc.",
-          "any.required": "Age group is required.",
-        }),
-    }),
-  },
-  demographics: {
-    query: Joi.object({
-      nationality: Joi.array()
-        .items(Joi.string().allow("")) // allows empty string inside
-        .optional(), // allows the field to be missing
-
-      gender: Joi.array().items(Joi.string().allow("")).optional(),
-
-      age: Joi.array()
-        .items(
-          Joi.string()
-            .valid(
-              "20-25",
-              "25-30",
-              "30-35",
-              "35-40",
-              "40-45",
-              "45-50",
-              "50-55",
-              "55-60",
-              "60+"
-            )
-            .allow("") // allows empty string inside array
-        )
-        .optional()
-        .messages({
-          "any.only":
-            "Invalid age group. Allowed values: '20-25', '25-30', '30-35', etc.",
-        }),
-    }),
-  },
-  getByQuestion: {
-    query: Joi.object({
-      limit: Joi.number().positive().required(),
-      offset: Joi.number().positive().required(),
-      questionType: Joi.string()
-        .valid("data_request", "survey", "external_resource", "dispute")
-        .required(),
-      isVoted: Joi.boolean().optional(),
-      search: Joi.string().trim().optional(),
-      orderField: Joi.string().valid("email", "price", "updatedAt"),
-      orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
-        is: Joi.exist(),
-        then: Joi.required(),
-      }),
-    }),
-  },
   verifyOtp: {
     body: Joi.object({
       otp: Joi.string().trim().required(),
+    }),
+  },
+  restPassword: {
+    body: Joi.object({
+      email: Joi.string().trim().email().required(),
+      password: joiPassword
+        .string()
+        .minOfSpecialCharacters(
+          configs.passwordPolicy && configs.passwordPolicy.minSpecialChars
+        )
+        .minOfLowercase(
+          configs.passwordPolicy && configs.passwordPolicy.minLowercase
+        )
+        .minOfUppercase(
+          configs.passwordPolicy && configs.passwordPolicy.minUppercase
+        )
+        .minOfNumeric(
+          configs.passwordPolicy && configs.passwordPolicy.minNumeric
+        )
+        .noWhiteSpaces()
+        .min(configs.passwordPolicy && configs.passwordPolicy.minLength)
+        .messages({
+          "password.minOfUppercase":
+            "{#label} should contain at least {#min} uppercase character",
+          "password.minOfSpecialCharacters":
+            "{#label} should contain at least {#min} special character",
+          "password.minOfLowercase":
+            "{#label} should contain at least {#min} lowercase character",
+          "password.minOfNumeric":
+            "{#label} should contain at least {#min} numeric character",
+          "password.noWhiteSpaces": "{#label} should not contain white spaces",
+        }),
+      confirmPassword: Joi.string()
+        .required()
+        .valid(Joi.ref("password"))
+        .messages({
+          "any.only": "{{#label}} does not match the password field",
+        }),
     }),
   },
   sendOtp: {

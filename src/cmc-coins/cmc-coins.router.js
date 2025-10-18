@@ -3,7 +3,7 @@ const router = require("express").Router();
 const { validate } = require("express-validation");
 const cmcCoinsController = require("./cmc-coins.controller");
 const cmcCoinsValidation = require("./cmc-coins.validation");
-//const JWT = require("../common/auth/jwt")
+const JWT = require("../common/auth/jwt");
 
 router.get(
   "/listings",
@@ -39,13 +39,27 @@ router.get(
   cmcCoinsController.getPriceChart
 );
 router.get(
-  "/compare",
+  "/converter",
   [
     // JWT.verifyAccessToken,
-    validate(cmcCoinsValidation.getCompare, { keyByField: true }),
+    validate(cmcCoinsValidation.getConverter, { keyByField: true }),
   ],
+  cmcCoinsController.getConverter
+);
+router.get(
+  "/popularConversions",
+  // [
+  //   // JWT.verifyAccessToken,
+  //   validate(cmcCoinsValidation.getCompare, { keyByField: true }),
+  // ],
+  cmcCoinsController.getPopularConversions
+);
+router.get(
+  "/compare",
+  [validate(cmcCoinsValidation.getCompare, { keyByField: true })],
   cmcCoinsController.getCompare
 );
+
 router.get(
   "/getPricePerformanceStats",
   [
@@ -68,6 +82,16 @@ router.get(
   cmcCoinsController.getById
 );
 router.get(
+  "/marketCapWithPricebyId",
+  [validate(cmcCoinsValidation.getById, { keyByField: true })],
+  cmcCoinsController.chartbyId
+);
+router.get(
+  "/volumeWithPricebyId",
+  [validate(cmcCoinsValidation.getById, { keyByField: true })],
+  cmcCoinsController.volumeChartbyId
+);
+router.get(
   "/getCoinByIdWithCMC",
   [validate(cmcCoinsValidation.getById, { keyByField: true })],
   cmcCoinsController.getCoinByIdWithCMC
@@ -77,6 +101,11 @@ router.get(
   "/AllCrypto",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getAllCrypto
+);
+router.get(
+  "/skipCoinId",
+  [validate(cmcCoinsValidation.skipCoinId, { keyByField: true })],
+  cmcCoinsController.getSkipCoinId
 );
 router.get(
   "/TopLossers",
@@ -92,6 +121,16 @@ router.get(
   "/Trending",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTrending
+);
+router.get(
+  "/New",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getNew
+);
+router.get(
+  "/explore/new",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getExploreNew
 );
 router.get(
   "/TopGainers",

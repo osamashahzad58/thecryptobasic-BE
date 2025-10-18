@@ -14,9 +14,14 @@ const transactionSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    // type: {
+    //   type: String,
+    //   enum: ["buy", "sell", "transfer"],
+    //   required: true,
+    // },
     type: {
       type: String,
-      enum: ["buy", "sell", "transfer"],
+      enum: ["buy", "sell", "transfer", "send", "receive"], // add these
       required: true,
     },
     transferDirection: {
@@ -43,12 +48,38 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       min: [0, "Quantity must be positive"],
     },
+    portfolioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "portfolio",
+      required: true,
+      index: true,
+    },
     fee: {
       type: Number,
       default: 0,
       min: [0, "Fee cannot be negative"],
     },
-
+    name: {
+      type: String,
+      trim: true,
+    },
+    chainName: {
+      type: String,
+      trim: true,
+    },
+    walletAddress: {
+      type: String,
+      trim: true,
+    },
+    icon: {
+      type: String,
+      trim: true,
+    },
+    symbol: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
     pricePerCoin: {
       type: Number,
       min: [0, "Price per coin must be positive"],
