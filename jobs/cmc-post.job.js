@@ -305,8 +305,19 @@ class DexScreenerWPBot {
   }
   // Enhanced SEO-optimized content with TradingView, FAQ, and social links
   generateSEOContent(tokenData, pairData) {
-    const symbol = pairData.baseToken.symbol || "Unknown";
-    const name = pairData.baseToken.name || symbol;
+    const capitalize = (str) => {
+      if (!str) return str;
+      // Check if the first character is a Latin letter
+      const isLatin = /^[A-Za-z]/.test(str);
+      if (isLatin) {
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+      }
+      // For Japanese/Chinese, return as-is
+      return str;
+    };
+
+    const symbol = capitalize(pairData.baseToken.symbol || "Unknown");
+    const name = capitalize(pairData.baseToken.name || symbol);
     const chain = pairData.chainId || "blockchain";
     const price = pairData.priceUsd || "N/A";
     const volume24h = pairData.volume?.h24 || 0;
