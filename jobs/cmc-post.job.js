@@ -312,7 +312,7 @@ class DexScreenerWPBot {
       if (isLatin) {
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
       }
-      // For Japanese/Chinese, return as-is
+      // For Japanese/Chinese,
       return str;
     };
 
