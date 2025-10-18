@@ -72,7 +72,7 @@ async function generateCoinImage(opts = {}) {
       format: "png", // png | webp
       watermark: "https://coinsupdate.org",
       badgePalette: ["#17c3b2", "#0a6fb2", "#003f7f"],
-      subtitle: "new listing",
+      subtitle: "",
       maxTitleLines: 3,
     },
     opts
