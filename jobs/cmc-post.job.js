@@ -29,6 +29,20 @@ if (cjkFontPath) {
   });
 }
 
+// try {
+//   const localFontPath = path.join(
+//     __dirname,
+//     "../assets/fonts/NotoSans-Regular.ttf"
+//   );
+//   if (fs.existsSync(localFontPath)) {
+//     registerFont(localFontPath, { family: "NotoSans" });
+//   } else {
+//     console.warn("Local NotoSans not found, using system default font");
+//   }
+// } catch (err) {
+//   console.warn("Font registration failed:", err.message);
+// }
+
 // Configuration
 const CONFIG = {
   wordpress: {
@@ -348,7 +362,17 @@ class DexScreenerWPBot {
 
     const content = `
 <!-- wp:paragraph {"className":"lead-intro"} -->
-<p class="lead-intro"><strong>${name} (${symbol})</strong> is a newly listed cryptocurrency token on the <strong>${chain.toUpperCase()} blockchain</strong> that's gaining significant attention in the DeFi space. This comprehensive analysis provides real-time price data, advanced charting, and essential trading insights for informed decision-making.</p>
+<p class="lead-intro">
+  <strong>${name} (${symbol})</strong> is a newly listed <strong>crypto currency</strong> token on the 
+  <strong>${chain.toUpperCase()} blockchain</strong> that's gaining attention across the DeFi and 
+  <strong>crypto news</strong> space. This comprehensive analysis covers live <strong>crypto coins news</strong>, 
+  updated <strong>crypto ranks</strong>, and the latest <strong>crypto bubbles</strong> trends. 
+  You’ll also find in-depth insights on <strong>crypto coins market cap</strong>, price movement, and 
+  how this coin compares in the wider <strong>coin news crypto</strong> ecosystem. Whether you're 
+  tracking market sentiment or watching for the next <strong>crypto bubble</strong>, this page brings 
+  you the data and context to make smarter trading decisions.
+</p>
+
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
