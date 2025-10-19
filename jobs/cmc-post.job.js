@@ -364,14 +364,17 @@ class DexScreenerWPBot {
 <!-- wp:paragraph {"className":"lead-intro"} -->
 <p class="lead-intro">
   <strong>${name} (${symbol})</strong> is a newly listed <strong>crypto currency</strong> token on the 
-  <strong>${chain.toUpperCase()} blockchain</strong> that's gaining attention across the DeFi and 
-  <strong>crypto news</strong> space. This comprehensive analysis covers live <strong>crypto coins news</strong>, 
-  updated <strong>crypto ranks</strong>, and the latest <strong>crypto bubbles</strong> trends. 
-  You’ll also find in-depth insights on <strong>crypto coins market cap</strong>, price movement, and 
-  how this coin compares in the wider <strong>coin news crypto</strong> ecosystem. Whether you're 
-  tracking market sentiment or watching for the next <strong>crypto bubble</strong>, this page brings 
-  you the data and context to make smarter trading decisions.
+  <strong>${chain.toUpperCase()} blockchain</strong> 
+  (<strong>Contract:</strong> <span class="contract-address">${contractAddress}</span>), 
+  gaining growing attention across the DeFi and <strong>crypto news</strong> space. 
+  This comprehensive analysis covers live <strong>crypto coins news</strong>, updated 
+  <strong>crypto ranks</strong>, and the latest <strong>crypto bubbles</strong> trends. 
+  You’ll also find detailed insights on <strong>crypto coins market cap</strong>, price movement, 
+  and how this project compares within the wider <strong>coin news crypto</strong> ecosystem. 
+  Whether you're tracking market sentiment or watching for the next <strong>crypto bubble</strong>, 
+  this page provides the data and context needed for informed trading decisions.
 </p>
+
 
 <!-- /wp:paragraph -->
 
