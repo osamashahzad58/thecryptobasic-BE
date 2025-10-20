@@ -6,7 +6,6 @@ const { createCanvas, registerFont } = require("canvas");
 const path = require("path");
 const generateCoinImage = require("../1");
 
-// English font
 registerFont("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", {
   family: "NotoSans",
 });
