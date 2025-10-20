@@ -18,6 +18,5 @@ module.exports = function registerScheduledJobs(getIO) {
   // fetchCMCMostVisited.initializeJob();
   // fetchCMCPrice.initializeJob();
 
-  // sirf coin price emitter ka cron chalao
   initializeJob(getIO);
 };
