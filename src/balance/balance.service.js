@@ -339,7 +339,7 @@ async function fetchExplorerTokenTransfersPaginated(
   walletAddress,
   chainName,
   pageSize = 100,
-  maxPages = 5
+  maxPages = 2
 ) {
   const cn = (chainName || "eth").toLowerCase();
   const cfg = EXPLORER_CONFIG[cn] || EXPLORER_CONFIG.eth;

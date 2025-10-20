@@ -171,6 +171,26 @@ exports.getById = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getSlug = async (req, res, next) => {
+  try {
+    const getSlugDto = { ...req.query };
+    const result = await cmcCoinsService.getSlug(getSlugDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin detail",
+      data: {
+        pricePerformance: result.pricePerformance,
+        stats: result.details,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.chartbyId = async (req, res, next) => {
   try {
     const chartbyIdDto = { ...req.query };

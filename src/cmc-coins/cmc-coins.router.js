@@ -82,6 +82,11 @@ router.get(
   cmcCoinsController.getById
 );
 router.get(
+  "/slug",
+  [validate(cmcCoinsValidation.getSlug, { keyByField: true })],
+  cmcCoinsController.getSlug
+);
+router.get(
   "/marketCapWithPricebyId",
   [validate(cmcCoinsValidation.getById, { keyByField: true })],
   cmcCoinsController.chartbyId

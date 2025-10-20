@@ -411,6 +411,29 @@ exports.getById = async (getPricePerformanceStatsDto) => {
   }
   return result;
 };
+exports.getSlug = async (getSlugDtoDto) => {
+  const result = {};
+  try {
+    const { slug } = getSlugDtoDto;
+    const dbData = await CmcCoinsModel.findOne({ slug: String(slug) });
+
+    const detailsData = dbData;
+
+    if (!detailsData || !detailsData.id) {
+      throw new Error(`No data found for ID: ${id}`);
+    }
+
+    result.details = detailsData;
+  } catch (error) {
+    console.error("Error:", error.message);
+    if (error.response) {
+      result.error = error.response.data;
+    } else {
+      result.error = error.message;
+    }
+  }
+  return result;
+};
 exports.chartbyId = async ({ id }) => {
   const result = {};
   try {
@@ -668,6 +691,7 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
       sparkline_7d: 1,
       percent_change_24h: 1,
       volume_24h: 1,
+      slug: 1,
     };
 
     // 2. Fetch paginated coins + total count
@@ -724,13 +748,13 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
 
 exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection, skipCoinId, userId } =
+    const { limit, offset, orderField, orderDirection, slug, userId } =
       getSkipCoinIdDto;
-
+    console.log(getSkipCoinIdDto, "getSkipCoinIdDto");
     // 1. Build filter
     const filter = {};
-    if (skipCoinId) {
-      filter.coinId = { $ne: skipCoinId.toString() }; // skip that coinId
+    if (slug) {
+      filter.slug = { $ne: slug.toString() }; // skip that coinId
     }
 
     // 2. Sorting
@@ -748,6 +772,7 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
       symbol: 1,
       coinId: 1,
       sparkline_7d: 1,
+      slug: 1,
     };
 
     // 4. Fetch coins and total count
@@ -781,9 +806,9 @@ exports.getSkipCoinId = async (getSkipCoinIdDto, result = {}) => {
       coins: coinsWithWatchlist,
     };
 
-    result.message = "Coins fetched successfully (excluding skipCoinId)";
+    result.message = "Coins fetched successfully (excluding slug)";
   } catch (ex) {
-    console.error("[getSkipCoinId] Error:", ex);
+    console.error("[slug] Error:", ex);
     result.ex = ex;
   } finally {
     return result;
