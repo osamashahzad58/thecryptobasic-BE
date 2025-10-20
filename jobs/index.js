@@ -10,13 +10,13 @@ require("../jobs/cmc-post.job");
 
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
-  // cmcList.initializeJob();
+  cmcList.initializeJob();
   // cmcStats.initializeJob();
-  // fetchCMCTrending.initializeJob();
-  // fetchCMCTopGainersAndLosers.initializeJob();
-  // fetchCMCNewTokens.initializeJob();
-  // fetchCMCMostVisited.initializeJob();
-  // fetchCMCPrice.initializeJob();
+  fetchCMCTrending.initializeJob();
+  fetchCMCTopGainersAndLosers.initializeJob();
+  fetchCMCNewTokens.initializeJob();
+  fetchCMCMostVisited.initializeJob();
+  fetchCMCPrice.initializeJob();
 
   initializeJob(getIO);
 };
