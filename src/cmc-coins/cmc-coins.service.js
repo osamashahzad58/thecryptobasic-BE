@@ -718,6 +718,7 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
       name: coin.name,
       symbol: coin.symbol,
       logo: coin.logo,
+      slug: coin.slug,
       sparkline_7d: coin.sparkline_7d,
       percent_change_24h: coin.percent_change_24h,
       price: Number(coin.price || 0),
