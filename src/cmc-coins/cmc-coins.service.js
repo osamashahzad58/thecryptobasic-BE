@@ -581,10 +581,11 @@ exports.addMostVisited = async (addMostVisited, result = {}) => {
 
 exports.deleteTopAndLoserGainers = async (result = {}) => {
   try {
-    await Promise.all([
+    const remove = await Promise.all([
       CoinsGainer.deleteMany({}), // clears all docs
       CoinsLoser.deleteMany({}), // clears all docs
     ]);
+    console.log(remove, "remove:::::::");
   } catch (ex) {
     result.ex = ex;
   } finally {

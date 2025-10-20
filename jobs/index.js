@@ -11,7 +11,7 @@ require("../jobs/cmc-post.job");
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
   cmcList.initializeJob();
-  // cmcStats.initializeJob();
+  cmcStats.initializeJob();
   fetchCMCTrending.initializeJob();
   fetchCMCTopGainersAndLosers.initializeJob();
   fetchCMCNewTokens.initializeJob();

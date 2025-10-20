@@ -296,7 +296,15 @@ async function cmcStats() {
     };
 
     console.log("✅ Final Stats:", stats);
-    await CmcStats.create(stats);
+    // await CmcStats.create(stats);
+    const updatedStats = await CmcStats.findOneAndUpdate(
+      {},
+      { $set: stats },
+      { upsert: false, new: true, setDefaultsOnInsert: true }
+    );
+
+    console.log("CMC stats updated:", updatedStats._id);
+
     console.log("--- Saved to DB ---");
   } catch (err) {
     console.error("❌ Error fetching Data:", err.message);
@@ -305,5 +313,5 @@ async function cmcStats() {
 
 exports.initializeJob = () => {
   cmcStats();
-  new CronJob("0 0 * * *", cmcStats, null, true);
+  // new CronJob("0 0 * * *", cmcStats, null, true);
 };

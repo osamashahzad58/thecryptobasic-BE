@@ -1,4 +1,5 @@
 const axios = require("axios");
+const CronJob = require("cron").CronJob; // <-- Add this line
 const configs = require("../configs");
 const coinsService = require("../src/cmc-coins/cmc-coins.service");
 
@@ -77,6 +78,6 @@ async function fetchCMCTrending() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCTrending();
-  // const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
+  // fetchCMCTrending();
+  const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
 };

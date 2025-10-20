@@ -1,6 +1,7 @@
 const axios = require("axios");
 const configs = require("../configs");
 const coinsService = require("../src/cmc-coins/cmc-coins.service");
+const CronJob = require("cron").CronJob; // <-- Add this line
 
 const MOST_VISITED_URL =
   "https://pro-api.coinmarketcap.com/v1/cryptocurrency/trending/most-visited";
@@ -77,6 +78,6 @@ async function fetchCMCMostVisited() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCMostVisited();
-  // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+  // fetchCMCMostVisited();
+  const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
 };

@@ -72,7 +72,7 @@ async function fetchCMCNewTokens() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCNewTokens();
-  // const job = new CronJob("10 * * * *", fetchCMCNewTokens, null, true);
-  // job.start();
+  // fetchCMCNewTokens();
+  const job = new CronJob("10 * * * *", fetchCMCNewTokens, null, true);
+  job.start();
 };
