@@ -4,6 +4,7 @@ const axios = require("axios");
 const https = require("https");
 const configs = require("../configs");
 const CmcStats = require("../src/cmc-coins/models/cmc-stats.model");
+const mongoose = require("mongoose");
 
 // 1. Fetch Global Market Data from CMC
 async function fetchCMCGlobal() {
@@ -273,7 +274,7 @@ async function cmcStats() {
       eth_dominance: marketData.eth_dominance || 0,
       eth_gas: ethGas || 0,
       fear_greed: parseInt(fearGreed.value, 10) || 0,
-      fear_greed_label: fearGreed.value_classification || "Unknown",
+      // fear_greed_yesterday: fearGreed.value_classification || "Neutral",
 
       // Bitget-derived fields
       altcoin_season: altcoinSeason?.altcoinSeason ?? 0,
@@ -297,13 +298,15 @@ async function cmcStats() {
 
     console.log("✅ Final Stats:", stats);
     // await CmcStats.create(stats);
+
+    const hardcodedId = new mongoose.Types.ObjectId("68caa4310350aadf632b3add"); // cast to ObjectId
     const updatedStats = await CmcStats.findOneAndUpdate(
-      {},
+      { _id: hardcodedId },
       { $set: stats },
-      { upsert: false, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    console.log("CMC stats updated:", updatedStats._id);
+    console.log("CMC stats updated:", updatedStats);
 
     console.log("--- Saved to DB ---");
   } catch (err) {
@@ -312,6 +315,6 @@ async function cmcStats() {
 }
 
 exports.initializeJob = () => {
-  cmcStats();
-  // new CronJob("0 0 * * *", cmcStats, null, true);
+  // cmcStats();
+  new CronJob("0 * * * *", cmcStats, null, true);
 };
