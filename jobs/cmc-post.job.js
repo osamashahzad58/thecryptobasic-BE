@@ -363,19 +363,13 @@ class DexScreenerWPBot {
     const content = `
 <!-- wp:paragraph {"className":"lead-intro"} -->
 <p class="lead-intro">
-  <strong>${name} (${symbol})</strong> is a newly listed <strong>crypto currency</strong> token on the 
-  <strong>${chain.toUpperCase()} blockchain</strong> 
-  (<strong>Contract:</strong> <span class="contract-address">${contractAddress}</span>), 
-  gaining growing attention across the DeFi and <strong>crypto news</strong> space. 
-  This comprehensive analysis covers live <strong>crypto coins news</strong>, updated 
-  <strong>crypto ranks</strong>, and the latest <strong>crypto bubbles</strong> trends. 
-  You’ll also find detailed insights on <strong>crypto coins market cap</strong>, price movement, 
-  and how this project compares within the wider <strong>coin news crypto</strong> ecosystem. 
-  Whether you're tracking market sentiment or watching for the next <strong>crypto bubble</strong>, 
-  this page provides the data and context needed for informed trading decisions.
+  <strong>${name} (${symbol})</strong> is a newly listed <strong>crypto currency</strong> token on the ${chain.toUpperCase()} blockchain Contract:<span class="contract-address">${contractAddress}</span>, gaining growing attention across the DeFi and crypto news space. 
 </p>
-
-
+<!-- /wp:paragraph -->
+<!-- wp:paragraph {"className":"lead-intro"} -->
+<p class="lead-intro">
+This comprehensive analysis covers live <strong>crypto coins news</strong>, updated <strong>crypto ranks</strong>, and the latest <strong>crypto bubbles</strong> trends. You’ll also find detailed insights on <strong>crypto coins market cap</strong>, price movement, and how this project compares within the wider <strong>coin news crypto</strong> ecosystem. Whether you're tracking market sentiment or watching for the next <strong>crypto bubble</strong>, this page provides the data and context needed for informed trading decisions.
+</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->

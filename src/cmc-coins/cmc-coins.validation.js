@@ -102,4 +102,10 @@ module.exports = {
       }),
     }),
   },
+  getAltCoin: {
+    query: Joi.object({
+      start: Joi.string().trim().optional(),
+      end: Joi.string().trim().optional(), // coinId to skip
+    }),
+  },
 };

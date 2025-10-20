@@ -3,6 +3,7 @@ const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const AltcoinCoinsModel = require("./models/cmc-Altcoin-Season");
 const CmcCoinsNew = require("./models/cmc-new.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
 const CoinsTrending = require("./models/cmc-trending.model");
@@ -16,6 +17,141 @@ exports.create = async (createDto, result = {}) => {
     const list = await CmcCoinsModel.create(createDto);
 
     result.data = list;
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTopGainersWithData = async (getTopGainersDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTopGainersDto;
+
+    const filter = {};
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    // Fetch paginated coins
+    const [coins, count] = await Promise.all([
+      CoinsGainer.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsGainer.countDocuments(filter),
+    ]);
+
+    // Extract coinIds and fetch related coin details
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+    );
+
+    // Merge coin details directly into each coin
+    const coinsWithData = coins.map((c) => {
+      const details = coinDetails.find((cd) => cd.coinId === c.coinId);
+      return {
+        ...c.toObject(),
+        ...(details ? details.toObject() : {}), // merge directly
+      };
+    });
+
+    result.data = {
+      count,
+      coins: coinsWithData,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTopGainersDto;
+
+    const filter = {};
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    // Fetch paginated coins
+    const [coins, count] = await Promise.all([
+      CoinsTrending.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsTrending.countDocuments(filter),
+    ]);
+
+    // Extract coinIds and fetch related coin details
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+    );
+
+    // Merge coin details directly into each coin
+    const coinsWithData = coins.map((c) => {
+      const details = coinDetails.find((cd) => cd.coinId === c.coinId);
+      return {
+        ...c.toObject(),
+        ...(details ? details.toObject() : {}), // merge directly
+      };
+    });
+
+    result.data = {
+      count,
+      coins: coinsWithData,
+      pages: Math.ceil(count / limit),
+    };
+  } catch (ex) {
+    result.ex = ex;
+  } finally {
+    return result;
+  }
+};
+exports.getTopLossersWithData = async (getTopGainersDto, result = {}) => {
+  try {
+    const { limit, offset, orderField, orderDirection } = getTopGainersDto;
+
+    const filter = {};
+    const sortOptions = {
+      ...(orderField && { [orderField]: +orderDirection }),
+    };
+
+    // Fetch paginated coins
+    const [coins, count] = await Promise.all([
+      CoinsLoser.find(filter, {}, { sort: sortOptions })
+        .limit(limit)
+        .skip((offset - 1) * limit),
+      CoinsLoser.countDocuments(filter),
+    ]);
+
+    // Extract coinIds and fetch related coin details
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+    );
+
+    // Merge coin details directly into each coin
+    const coinsWithData = coins.map((c) => {
+      const details = coinDetails.find((cd) => cd.coinId === c.coinId);
+      return {
+        ...c.toObject(),
+        ...(details ? details.toObject() : {}), // merge directly
+      };
+    });
+
+    result.data = {
+      count,
+      coins: coinsWithData,
+      pages: Math.ceil(count / limit),
+    };
   } catch (ex) {
     result.ex = ex;
   } finally {
@@ -97,6 +233,27 @@ exports.address = async (addressDto, result = {}) => {
       ex.response ? ex.response.data : ex.message
     );
     result.error = ex.response ? ex.response.data : ex.message;
+  } finally {
+    return result;
+  }
+};
+
+exports.getAltCoin = async (getAltCoinDto, result = {}) => {
+  try {
+    // Fixed document _id
+    const fixedId = "68f63f5b02765f1573f0de1e";
+
+    // Fetch the document from MongoDB
+    const dbData = await AltcoinCoinsModel.findOne({ _id: fixedId }).lean();
+
+    // Return only the relevant data
+    result.data = dbData || {};
+  } catch (ex) {
+    console.error(
+      "Error fetching Altcoin Season data:",
+      ex.response?.data || ex.message
+    );
+    result.error = ex.response?.data || ex.message;
   } finally {
     return result;
   }

@@ -108,9 +108,24 @@ router.get(
   cmcCoinsController.getAllCrypto
 );
 router.get(
+  "/TopGainersWithData",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTopGainersWithData
+);
+router.get(
+  "/TrendingWithData",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTrendingWithData
+);
+router.get(
   "/skipCoinId",
   [validate(cmcCoinsValidation.skipCoinId, { keyByField: true })],
   cmcCoinsController.getSkipCoinId
+);
+router.get(
+  "/altcoin-season",
+  [validate(cmcCoinsValidation.getAltCoin, { keyByField: true })],
+  cmcCoinsController.getAltCoin
 );
 router.get(
   "/TopLossers",
