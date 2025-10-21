@@ -8,6 +8,7 @@ const AltcoinCoinsModel = require("./models/cmc-Altcoin-Season");
 const CmcCoinsNew = require("./models/cmc-new.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
 const CoinsTrending = require("./models/cmc-trending.model");
+const CoinsAltcoin = require("./models/cmc-Altcoin-Season");
 const CoinsGainer = require("./models/cmc-topGainners.model");
 const CoinsMostVisited = require("./models/cmc-mostVisited.model");
 const CoinsStats = require("./models/cmc-stats.model");
@@ -1264,9 +1265,13 @@ exports.getTopstats = async ({ id }, result = {}) => {
     const btcSentiment = await CmcBtcSentimentModel.findOne({
       _id: new ObjectId("68f63f5b02765f1573f0de1e"),
     });
+    const altcoinseasons = await CoinsAltcoin.findOne({
+      _id: new ObjectId("68f63f5b02765f1573f0de1e"),
+    });
     result.data = {
       coinStats,
       btcSentiment,
+      altcoinseasons,
     };
     result.success = true;
   } catch (ex) {
