@@ -911,7 +911,9 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
       percent_change_24h: 1,
       percent_change_7d: 1,
       volume_change_24h: 1,
-      sparkline_7d: 1,
+      sparkline_7d:
+        1 ||
+        "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
       percent_change_24h: 1,
       volume_24h: 1,
       slug: 1,
