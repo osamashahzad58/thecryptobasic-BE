@@ -3,6 +3,7 @@ const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const CmcBtcSentimentModel = require("./models/cmc-BtcSentiment");
 const AltcoinCoinsModel = require("./models/cmc-Altcoin-Season");
 const CmcCoinsNew = require("./models/cmc-new.model");
 const CoinsLoser = require("./models/cmc-topLosser.model");
@@ -1191,10 +1192,16 @@ exports.getTopLossers = async (getTopLossersDto, result = {}) => {
 };
 exports.getTopstats = async ({ id }, result = {}) => {
   try {
-    const question = await CoinsStats.findOne({
-      _id: ObjectId(id),
+    const coinStats = await CoinsStats.findOne({
+      _id: new ObjectId("68caa4310350aadf632b3add"),
     });
-    result.data = question;
+    const btcSentiment = await CmcBtcSentimentModel.findOne({
+      _id: new ObjectId("68f63f5b02765f1573f0de1e"),
+    });
+    result.data = {
+      coinStats,
+      btcSentiment,
+    };
     result.success = true;
   } catch (ex) {
     console.error("Error while fetching the question:", ex.message);

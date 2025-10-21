@@ -18,7 +18,7 @@ async function fetchCMCTrending() {
     // 1. Fetch trending coins
     const res = await axios.get(TRENDING_URL, {
       headers,
-      params: { start: 1, limit: 20 },
+      params: { start: 1, limit: 200 },
     });
 
     const coins = res.data.data || [];
@@ -78,6 +78,6 @@ async function fetchCMCTrending() {
 }
 
 exports.initializeJob = () => {
-  // fetchCMCTrending();
-  const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
+  fetchCMCTrending();
+  // const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
 };
