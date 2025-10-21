@@ -58,11 +58,25 @@ exports.getTopGainersWithData = async (getTopGainersDto, result = {}) => {
       };
 
       return {
-        ...merged,
-        price: merged.currentprice, // rename currentprice to price
-        rank: merged.marketCapRank, // rename marketCapRank to rank
-        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
-        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
+        _id: merged._id,
+        coinId: merged.coinId,
+        symbol: merged.symbol,
+        name: merged.name,
+        slug: merged.slug,
+        change24hVol: merged.change24hVol,
+        change1h: merged.change1h,
+        price: merged.price || merged.currentprice,
+        rank: merged.cmcRank || merged.marketCapRank,
+        logo: merged.logo || merged.imageurl,
+        sparkline_7d:
+          merged.sparkline_7d ||
+          "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
+        percent_change_1h: merged.percent_change_1h,
+        percent_change_24h: merged.percent_change_24h,
+        percent_change_7d: merged.percent_change_7d,
+        volume_24h: merged.volume_24h,
+        market_cap: merged.market_cap,
+        createdAt: merged.createdAt,
       };
     });
 
@@ -86,7 +100,6 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
       ...(orderField && { [orderField]: +orderDirection }),
     };
 
-    // Fetch paginated coins
     const [coins, count] = await Promise.all([
       CoinsTrending.find(filter, {}, { sort: sortOptions })
         .limit(limit)
@@ -94,15 +107,13 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
       CoinsTrending.countDocuments(filter),
     ]);
 
-    // Extract coinIds and fetch related coin details
     const coinIds = coins.map((c) => c.coinId);
     const coinDetails = await CmcCoinsModel.find({
       coinId: { $in: coinIds },
     }).select(
-      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank"
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank logo price"
     );
 
-    // Merge coin details directly into each coin
     const coinsWithData = coins.map((c) => {
       const details = coinDetails.find((cd) => cd.coinId === c.coinId);
       const merged = {
@@ -111,11 +122,25 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
       };
 
       return {
-        ...merged,
-        price: merged.currentprice, // rename currentprice to price
-        rank: merged.marketCapRank, // rename marketCapRank to rank
-        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
-        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
+        _id: merged._id,
+        coinId: merged.coinId,
+        symbol: merged.symbol,
+        name: merged.name,
+        slug: merged.slug,
+        change24hVol: merged.change24hVol,
+        change1h: merged.change1h,
+        price: merged.price || merged.currentprice,
+        rank: merged.cmcRank || merged.marketCapRank,
+        logo: merged.logo || merged.imageurl,
+        sparkline_7d:
+          merged.sparkline_7d ||
+          "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
+        percent_change_1h: merged.percent_change_1h,
+        percent_change_24h: merged.percent_change_24h,
+        percent_change_7d: merged.percent_change_7d,
+        volume_24h: merged.volume_24h,
+        market_cap: merged.market_cap,
+        createdAt: merged.createdAt,
       };
     });
 
@@ -130,6 +155,7 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
     return result;
   }
 };
+
 exports.getTopLossersWithData = async (getTopGainersDto, result = {}) => {
   try {
     const { limit, offset, orderField, orderDirection } = getTopGainersDto;
@@ -164,11 +190,25 @@ exports.getTopLossersWithData = async (getTopGainersDto, result = {}) => {
       };
 
       return {
-        ...merged,
-        price: merged.currentprice, // rename currentprice to price
-        rank: merged.marketCapRank, // rename marketCapRank to rank
-        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
-        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
+        _id: merged._id,
+        coinId: merged.coinId,
+        symbol: merged.symbol,
+        name: merged.name,
+        slug: merged.slug,
+        change24hVol: merged.change24hVol,
+        change1h: merged.change1h,
+        price: merged.price || merged.currentprice,
+        rank: merged.cmcRank || merged.marketCapRank,
+        logo: merged.logo || merged.imageurl,
+        sparkline_7d:
+          merged.sparkline_7d ||
+          "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
+        percent_change_1h: merged.percent_change_1h,
+        percent_change_24h: merged.percent_change_24h,
+        percent_change_7d: merged.percent_change_7d,
+        volume_24h: merged.volume_24h,
+        market_cap: merged.market_cap,
+        createdAt: merged.createdAt,
       };
     });
 
