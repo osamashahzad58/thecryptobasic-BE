@@ -113,6 +113,11 @@ router.get(
   cmcCoinsController.getTopGainersWithData
 );
 router.get(
+  "/TopLossersWithData",
+  [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
+  cmcCoinsController.getTopLossersWithData
+);
+router.get(
   "/TrendingWithData",
   [validate(cmcCoinsValidation.AllCrypto, { keyByField: true })],
   cmcCoinsController.getTrendingWithData
