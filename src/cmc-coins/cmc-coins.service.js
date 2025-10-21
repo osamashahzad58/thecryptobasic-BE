@@ -46,15 +46,23 @@ exports.getTopGainersWithData = async (getTopGainersDto, result = {}) => {
     const coinDetails = await CmcCoinsModel.find({
       coinId: { $in: coinIds },
     }).select(
-      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank"
     );
 
     // Merge coin details directly into each coin
     const coinsWithData = coins.map((c) => {
       const details = coinDetails.find((cd) => cd.coinId === c.coinId);
-      return {
+      const merged = {
         ...c.toObject(),
-        ...(details ? details.toObject() : {}), // merge directly
+        ...(details ? details.toObject() : {}),
+      };
+
+      return {
+        ...merged,
+        price: merged.currentprice, // rename currentprice to price
+        rank: merged.marketCapRank, // rename marketCapRank to rank
+        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
+        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
       };
     });
 
@@ -91,15 +99,23 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
     const coinDetails = await CmcCoinsModel.find({
       coinId: { $in: coinIds },
     }).select(
-      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank"
     );
 
     // Merge coin details directly into each coin
     const coinsWithData = coins.map((c) => {
       const details = coinDetails.find((cd) => cd.coinId === c.coinId);
-      return {
+      const merged = {
         ...c.toObject(),
-        ...(details ? details.toObject() : {}), // merge directly
+        ...(details ? details.toObject() : {}),
+      };
+
+      return {
+        ...merged,
+        price: merged.currentprice, // rename currentprice to price
+        rank: merged.marketCapRank, // rename marketCapRank to rank
+        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
+        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
       };
     });
 
@@ -136,15 +152,23 @@ exports.getTopLossersWithData = async (getTopGainersDto, result = {}) => {
     const coinDetails = await CmcCoinsModel.find({
       coinId: { $in: coinIds },
     }).select(
-      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d"
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank"
     );
 
     // Merge coin details directly into each coin
     const coinsWithData = coins.map((c) => {
       const details = coinDetails.find((cd) => cd.coinId === c.coinId);
-      return {
+      const merged = {
         ...c.toObject(),
-        ...(details ? details.toObject() : {}), // merge directly
+        ...(details ? details.toObject() : {}),
+      };
+
+      return {
+        ...merged,
+        price: merged.currentprice, // rename currentprice to price
+        rank: merged.marketCapRank, // rename marketCapRank to rank
+        logo: merged.imageurl || merged.logo, // rename imageurl to logo, fallback to logo
+        rank: merged.cmcRank || merged.cmcRank, // rename imageurl to logo, fallback to logo
       };
     });
 
