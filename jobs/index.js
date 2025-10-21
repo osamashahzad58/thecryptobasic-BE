@@ -16,11 +16,11 @@ module.exports = function registerScheduledJobs(getIO) {
   // fetchDominanceChart.initializeJob();
   // cmcStats.initializeJob();
   // fetchCMCBtcSentiment.initializeJob();
-  fetchCMCTrending.initializeJob();
-  fetchCMCTopGainersAndLosers.initializeJob();
-  fetchCMCNewTokens.initializeJob();
-  fetchCMCMostVisited.initializeJob();
-  fetchCMCPrice.initializeJob();
+  // fetchCMCTrending.initializeJob();
+  // fetchCMCTopGainersAndLosers.initializeJob();
+  // fetchCMCNewTokens.initializeJob();
+  // fetchCMCMostVisited.initializeJob();
+  // fetchCMCPrice.initializeJob();
 
   initializeJob(getIO);
 };

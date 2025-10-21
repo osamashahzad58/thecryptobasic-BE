@@ -1059,6 +1059,13 @@ exports.getTopGainers = async (getTopGainersDto, result = {}) => {
       CoinsGainer.countDocuments(filter),
     ]);
 
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank logo price"
+    );
+
     // Merge coin details directly into each coin and rename fields
     const coinsWithData = coins.map((c) => {
       const details = coinDetails.find((cd) => cd.coinId === c.coinId);
@@ -1251,6 +1258,12 @@ exports.getNew = async (getTrendingDto, result = {}) => {
         .skip((offset - 1) * limit),
       CoinsTrending.countDocuments(filter),
     ]);
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank logo price"
+    );
 
     // Merge coin details directly into each coin and rename fields
     const coinsWithData = coins.map((c) => {
@@ -1385,10 +1398,46 @@ exports.getTopLossers = async (getTopLossersDto, result = {}) => {
         .skip((offset - 1) * limit),
       CoinsLoser.countDocuments(filter),
     ]);
+    const coinIds = coins.map((c) => c.coinId);
+    const coinDetails = await CmcCoinsModel.find({
+      coinId: { $in: coinIds },
+    }).select(
+      "coinId createdAt percent_change_7d percent_change_24h percent_change_1h volume_24h market_cap sparkline_7d cmcRank logo price"
+    );
 
+    // Merge coin details directly into each coin and rename fields
+    const coinsWithData = coins.map((c) => {
+      const details = coinDetails.find((cd) => cd.coinId === c.coinId);
+      const merged = {
+        ...c.toObject(),
+        ...(details ? details.toObject() : {}),
+      };
+
+      return {
+        _id: merged._id,
+        coinId: merged.coinId,
+        symbol: merged.symbol,
+        name: merged.name,
+        slug: merged.slug,
+        change24hVol: merged.change24hVol,
+        change1h: merged.change1h,
+        price: merged.price,
+        rank: merged.cmcRank || merged.marketCapRank,
+        logo: merged.logo || merged.imageurl,
+        sparkline_7d:
+          merged.sparkline_7d ||
+          "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
+        percent_change_1h: merged.percent_change_1h,
+        percent_change_24h: merged.percent_change_24h,
+        percent_change_7d: merged.percent_change_7d,
+        volume_24h: merged.volume_24h,
+        market_cap: merged.market_cap,
+        createdAt: merged.createdAt,
+      };
+    });
     result.data = {
       count,
-      coins,
+      coins: coinsWithData,
       pages: Math.ceil(count / limit),
     };
   } catch (ex) {

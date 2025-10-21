@@ -131,10 +131,10 @@ async function cmcList() {
           market_cap_change_24h: marketCapChange24h,
           volume: coin.quote?.USD?.volume_24h || null,
         };
-        console.log(todayData, "todayData");
         const { monthHigh, monthLow, high_24h, low_24h, ath, atl } =
           await getOHLCV(coin.id);
         const markets = await getMarkets(coin.id);
+        console.log(markets, "markets");
 
         const wallets = infoData[coin.id]?.urls?.wallet || [];
         const audits = infoData[coin.id]?.audit_info_list || [];
