@@ -32,37 +32,30 @@ const tokenSchema = new mongoose.Schema({
   balance: {
     type: Number,
     required: true,
-    min: 0,
   },
   priceUSD: {
     type: Number,
     default: 0,
-    min: 0,
   },
   percent_change_1h: {
     type: Number,
     default: 0,
-    min: 0,
   },
   percent_change_24h: {
     type: Number,
     default: 0,
-    min: 0,
   },
   profitLossUSD: {
     type: Number,
     default: 0,
-    min: 0,
   },
   percent_change_7d: {
     type: Number,
     default: 0,
-    min: 0,
   },
   totalValueUSD: {
     type: Number,
     default: 0,
-    min: 0,
   },
 });
 

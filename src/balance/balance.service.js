@@ -31,7 +31,6 @@ const ARBISCAN_API_KEY = (process.env.ARBISCAN_API_KEY || "").trim();
 function chainHexToName(chain) {
   if (!chain) return "eth";
   const c = (chain + "").toLowerCase();
-  console.log(c, "ccccccc");
   if (c.startsWith("0x")) {
     const map = {
       "0x1": "eth",
@@ -47,7 +46,6 @@ function chainHexToName(chain) {
 
 function chainNameToEtherscanChainId(chainName) {
   const name = (chainName || "eth").toLowerCase();
-  console.log(name, "name:::::::::::::::50");
   const map = {
     eth: 1,
     ethereum: 1,
@@ -257,8 +255,6 @@ async function getWalletTokensMoralis(walletAddress, chain) {
     const chainName = chainHexToName(chain);
     const url = `https://deep-index.moralis.io/api/v2.2/wallets/${walletAddress}/tokens?chain=${chainName}`;
 
-    console.log("🌐 [MORALIS] Fetching tokens:", url);
-
     const data = await safeFetchJson(url, {
       headers: {
         accept: "application/json",
@@ -360,7 +356,6 @@ async function fetchExplorerTokenTransfersPaginated(
         apikey: ETHERSCAN_API_KEY,
       });
       const url = `${cfg.v2Base}?${params.toString()}`;
-      console.log(`[Etherscan V2] Fetch page ${page} -> ${url}`);
       try {
         const data = await safeFetchJson(url);
         if (!data || !Array.isArray(data.result)) {
@@ -496,7 +491,7 @@ async function deriveTokenBalancesFromTransfers(transfers, walletLower) {
 
     return {
       tokenAddress: v.contract,
-      coinId: meta.coinId,
+      coinId: meta.coinId || v.symbol,
       name: meta.name,
       symbol: v.symbol,
       logo: meta.logo,
@@ -555,9 +550,6 @@ async function fetchTransfers(walletAddress, chain) {
           : [];
 
         if (result.length > 0) {
-          console.log(
-            `[Transfers] Moralis success with ${result.length} transfers.`
-          );
           return result;
         }
 
@@ -748,10 +740,18 @@ exports.create = async (createDto, result = {}) => {
       chainName: chainName,
       isMe: typeof isMe === "boolean" ? isMe : false, // ✅ default false
     });
+    // --- STEP 1.1: Sanitize tokens before saving ---
+    const sanitizedTokens = tokens.map((token) => ({
+      ...token,
+      coinId: token.coinId || token.symbol || "UNKNOWN", // fallback if null
+      name: token.name || token.symbol,
+      logo: token.logo || "",
+      priceUSD: typeof token.priceUSD === "number" ? token.priceUSD : 0,
+    }));
 
     const updateData = {
       walletAddress: walletAddress.toLowerCase(),
-      tokens: Array.isArray(tokens) ? tokens : [],
+      tokens: sanitizedTokens ? sanitizedTokens : [],
       ...(name && { name }),
       isMe: typeof isMe === "boolean" ? isMe : false, // ✅ default false
       userId: new mongoose.Types.ObjectId(userId),
@@ -760,19 +760,9 @@ exports.create = async (createDto, result = {}) => {
       isBlockchain: true,
     };
     const walletLower = walletAddress.toLowerCase();
-
-    // const walletDoc = await Balance.create(updateData);
-
-    const walletDoc = await Balance.findOneAndUpdate(
-      { walletAddress: walletLower, userId }, // Query filter
-      { $set: updateData }, // Update operation
-      { upsert: true, new: true, setDefaultsOnInsert: true } // Options
-    );
-
-    console.log("💾 [Balance] Wallet saved:", walletDoc);
+    const walletDoc = await Balance.create(updateData);
 
     // --- STEP 3: Process & Insert Transactions (Concurrency FTW) ---
-    console.log(`📦 Total transfers available: ${transfers.length}`);
     const chainId = new mongoose.Types.ObjectId(userId);
     const portfolioId = new mongoose.Types.ObjectId(portfolio._id);
     let address;
@@ -831,9 +821,7 @@ exports.create = async (createDto, result = {}) => {
     // Execute all transaction lookups concurrently
     const txs = (await Promise.all(txPromises)).filter((t) => t !== null);
 
-    console.log(`📊 Prepared ${txs.length} transactions for DB insert`);
     if (txs.length) {
-      console.log("🧩 Sample tx:", JSON.stringify(txs[0], null, 2));
       const inserted = await Transaction.insertMany(txs, {
         ordered: false,
       }).catch((err) => {
@@ -846,11 +834,6 @@ exports.create = async (createDto, result = {}) => {
         }
         return err?.insertedDocs || [];
       });
-      console.log(
-        `✅ Inserted ${
-          Array.isArray(inserted) ? inserted.length : 0
-        } transactions`
-      );
     } else {
       console.log("⚠️ No new transactions to insert");
     }
@@ -869,7 +852,6 @@ exports.create = async (createDto, result = {}) => {
 exports.allAsset = async (byUserIdDto, result = {}) => {
   try {
     const { userId, offset, limit } = byUserIdDto;
-    console.log(byUserIdDto, "byUserIdDto");
 
     if (!userId) {
       result.ex = new Error("Missing userId");
@@ -1192,7 +1174,6 @@ const toObjectId = (id) => {
 exports.balanceStats = async (statsDto, result = {}) => {
   try {
     const { userId, portfolioId, timeFilter } = statsDto || {};
-    console.log(statsDto, "statsDto");
     // validation
     if (!userId) {
       result.ex = "userId is required";
@@ -1259,7 +1240,7 @@ exports.balanceStats = async (statsDto, result = {}) => {
       if (!map.has(key)) {
         map.set(key, {
           key,
-          coinId: t.coinId || null,
+          coinId: t.coinId || t.symbol || null,
           name: t.name || t.symbol || key,
           symbol: t.symbol || null,
           logo: t.logo || null,
@@ -1459,7 +1440,7 @@ exports.chartBalance = async (chartDto, result = {}) => {
 
       if (!map.has(key)) {
         map.set(key, {
-          coinId: t.coinId || null,
+          coinId: t.coinId || t.symbol || null,
           name: t.name || t.symbol || key,
           symbol: t.symbol || null,
           value,
@@ -1510,7 +1491,7 @@ exports.chartBalance = async (chartDto, result = {}) => {
     const assetsChart = distribution
       .sort((a, b) => b.value - a.value)
       .map((d) => ({
-        coinId: d.coinId,
+        coinId: d.coinId || d.symbol,
         name: d.name,
         symbol: d.symbol,
         value: d.value,
