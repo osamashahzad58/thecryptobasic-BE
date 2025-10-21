@@ -889,18 +889,19 @@ exports.deleteNewTokens = async (result = {}) => {
 //     return result;
 //   }
 // };
-
 exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
   try {
-    const { limit, offset, orderField, orderDirection, userId } =
-      getAllCryptoDto;
+    const {
+      limit = 10,
+      offset = 1,
+      orderField,
+      orderDirection = 1,
+      userId,
+    } = getAllCryptoDto;
 
     const filter = {};
-    const sortOptions = orderField
-      ? { [orderField]: Number(orderDirection) || 1 }
-      : {};
 
-    // 1. Define the fields you actually want
+    // Projection for required fields
     const projection = {
       coinId: 1,
       name: 1,
@@ -912,41 +913,53 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
       percent_change_24h: 1,
       percent_change_7d: 1,
       volume_change_24h: 1,
-      sparkline_7d:
-        1 ||
-        "https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/1.svg",
-      percent_change_24h: 1,
+      sparkline_7d: 1,
       volume_24h: 1,
       slug: 1,
+      cmcRank: 1,
     };
 
-    // 2. Fetch paginated coins + total count
-    const [coins, count] = await Promise.all([
-      CmcCoinsModel.find(filter, projection, { sort: sortOptions })
-        .limit(Number(limit))
-        .skip((Number(offset) - 1) * Number(limit))
-        .lean(),
-      CmcCoinsModel.countDocuments(filter),
-    ]);
+    // Aggregation pipeline
+    const pipeline = [
+      // Convert cmcRank to number for proper numeric sorting
+      { $addFields: { cmcRankNum: { $toInt: "$cmcRank" } } },
+      { $match: filter },
+    ];
 
-    // 3. Get user’s watchlist (if logged in)
+    // Sorting
+    if (orderField) {
+      if (orderField === "cmcRank") {
+        pipeline.push({ $sort: { cmcRankNum: Number(orderDirection) || 1 } });
+      } else {
+        pipeline.push({ $sort: { [orderField]: Number(orderDirection) || 1 } });
+      }
+    } else {
+      pipeline.push({ $sort: { cmcRankNum: 1 } }); // default by rank ascending
+    }
+
+    // Pagination
+    pipeline.push({ $skip: (Number(offset) - 1) * Number(limit) });
+    pipeline.push({ $limit: Number(limit) });
+
+    // Projection
+    pipeline.push({ $project: projection });
+
+    // Execute aggregation
+    const coinsAgg = CmcCoinsModel.aggregate(pipeline);
+    const countPromise = CmcCoinsModel.countDocuments(filter);
+
+    const [coins, count] = await Promise.all([coinsAgg, countPromise]);
+
+    // Fetch user's watchlist if available
     let watchlistMap = new Map();
     if (userId) {
       const watchlist = await Watchlist.find({ userId }).lean();
-      watchlist.forEach((w) => {
-        watchlistMap.set(w.coinId, w.isWatchlist); // true / false
-      });
+      watchlist.forEach((w) => watchlistMap.set(w.coinId, w.isWatchlist));
     }
 
-    // 4. Attach isWatchlist to each coin
+    // Format coins with numeric fields and watchlist
     const coinsWithWatchlist = coins.map((coin) => ({
-      coinId: coin.coinId,
-      name: coin.name,
-      symbol: coin.symbol,
-      logo: coin.logo,
-      slug: coin.slug,
-      sparkline_7d: coin.sparkline_7d,
-      percent_change_24h: coin.percent_change_24h,
+      ...coin,
       price: Number(coin.price || 0),
       market_cap: Number(coin.market_cap || 0),
       percent_change_1h: Number(coin.percent_change_1h || 0),
@@ -957,13 +970,12 @@ exports.getAllCrypto = async (getAllCryptoDto, result = {}) => {
       isWatchlist: watchlistMap.get(coin.coinId) || false,
     }));
 
-    // 5. Return final response
+    // Final response
     result.data = {
       count,
       pages: Math.ceil(count / limit),
       coins: coinsWithWatchlist,
     };
-
     result.message = "Coins fetched successfully";
   } catch (ex) {
     console.error("[getAllCrypto] Error:", ex);

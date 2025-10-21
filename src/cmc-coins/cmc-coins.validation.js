@@ -81,7 +81,7 @@ module.exports = {
       userId: Joi.string().trim().optional(),
       search: Joi.string().optional(),
       offset: Joi.number().positive().required(),
-      orderField: Joi.string().valid("price"),
+      orderField: Joi.string().valid("price", "cmcRank"),
       orderDirection: Joi.number().integer().valid(1, -1).when("orderField", {
         is: Joi.exist(),
         then: Joi.required(),
