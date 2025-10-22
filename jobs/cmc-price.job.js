@@ -37,25 +37,16 @@ async function fetchCMCPrice() {
     const allCoins = await CmcCoins.find({}, { coinId: 1 }).lean();
     const coinIds = allCoins.map((c) => String(c.coinId)).filter(Boolean);
     const totalCoins = coinIds.length;
-    console.log(allCoins);
     if (!totalCoins) {
       console.log("No coins found in DB.");
       return;
     }
-
-    console.log(`Total coins in DB: ${totalCoins}`);
 
     const idChunks = chunkArray(coinIds, 100);
     let totalUpdated = 0;
 
     for (let i = 0; i < idChunks.length; i++) {
       const idsParam = idChunks[i].join(",");
-
-      // ✅ Log request info before hitting the API
-      console.log(
-        `\n📡 Fetching data from CMC (chunk ${i + 1}/${idChunks.length})`
-      );
-      console.log(`Request URL: ${CMC_API_BASE}?id=${idsParam}&convert=USD`);
 
       const res = await axios.get(CMC_API_BASE, {
         params: { id: idsParam, convert: "USD" },
@@ -130,16 +121,8 @@ async function fetchCMCPrice() {
       const result = await CmcCoins.bulkWrite(updates, { ordered: false });
       const modified = result.modifiedCount ?? 0;
       totalUpdated += modified;
-
-      console.log(
-        `✅ Chunk ${i + 1}/${idChunks.length}: updated ${modified} coins`
-      );
       await sleep(200);
     }
-
-    console.log(
-      `--- Update Complete. Total coins updated: ${totalUpdated}/${totalCoins} ---`
-    );
   } catch (err) {
     console.error("❌ Fatal error in fetchCMCPrice:", err.message);
     if (err.response?.data) console.error(err.response.data);
