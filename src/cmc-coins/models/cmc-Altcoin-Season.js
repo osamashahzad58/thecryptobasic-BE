@@ -31,6 +31,7 @@ const TopCryptoSchema = new mongoose.Schema({
   name: { type: String, required: true },
   symbol: { type: String, required: true },
   slug: { type: String, required: true },
+  logo: { type: String },
   percentChange: { type: Number, default: 0 },
 });
 

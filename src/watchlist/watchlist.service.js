@@ -89,6 +89,7 @@ exports.byUserId = async ({ userId }, result = {}) => {
         {
           coinId: 1,
           logo: 1,
+          slug: 1,
           price: 1,
           name: 1,
           symbol: 1,

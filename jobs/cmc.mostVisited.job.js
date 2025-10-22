@@ -18,7 +18,7 @@ async function fetchCMCMostVisited() {
     // 1. Fetch most visited coins
     const res = await axios.get(MOST_VISITED_URL, {
       headers,
-      params: { start: 1, limit: 500, time_period: "24h" },
+      params: { start: 1, limit: 100, time_period: "24h" },
     });
 
     const coins = res.data.data || [];
@@ -57,7 +57,6 @@ async function fetchCMCMostVisited() {
         currentprice: quote.price,
         imageurl: info.logo,
         marketCapRank: c.cmc_rank,
-        trafficScore: c.traffic_score,
         sparklineUrl: sparklineUrl,
         timestamp: new Date(),
       });
