@@ -64,6 +64,7 @@ exports.getTopGainersWithData = async (getTopGainersDto, result = {}) => {
         symbol: merged.symbol,
         name: merged.name,
         slug: merged.slug,
+        marketCapRank: merged.marketCapRank,
         change24hVol: merged.change24hVol,
         change1h: merged.change1h,
         price: merged.price || merged.currentprice,
@@ -126,6 +127,7 @@ exports.getTrendingWithData = async (getTopGainersDto, result = {}) => {
         _id: merged._id,
         coinId: merged.coinId,
         symbol: merged.symbol,
+        marketCapRank: merged.marketCapRank,
         name: merged.name,
         slug: merged.slug,
         change24hVol: merged.change24hVol,
@@ -193,6 +195,7 @@ exports.getTopLossersWithData = async (getTopGainersDto, result = {}) => {
       return {
         _id: merged._id,
         coinId: merged.coinId,
+        marketCapRank: merged.marketCapRank,
         symbol: merged.symbol,
         name: merged.name,
         slug: merged.slug,
