@@ -78,6 +78,6 @@ async function fetchCMCTrending() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCTrending();
-  // const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
+  // fetchCMCTrending();
+  const job = new CronJob("15 * * * *", fetchCMCTrending, null, true);
 };

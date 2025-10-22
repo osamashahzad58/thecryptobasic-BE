@@ -76,6 +76,6 @@ async function fetchCMCMostVisited() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCMostVisited();
-  // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+  // fetchCMCMostVisited();
+  const job = new CronJob("15 * * * *", fetchCMCMostVisited, null, true);
 };

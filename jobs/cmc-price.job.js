@@ -8,7 +8,8 @@ const CmcCoins = require("../src/cmc-coins/models/cmc-coins.model");
 // ===============================
 const CMC_API_BASE =
   "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest";
-const CRON_SCHEDULE = configs.coinMarketCap?.cronSchedule || "*/60 * * * * *"; // every 60 sec
+// const CRON_SCHEDULE = configs.coinMarketCap?.cronSchedule || "*/60 * * * * *"; // every 60 sec
+const CRON_SCHEDULE = configs.coinMarketCap?.cronSchedule || "*/1 * * * *"; // every 60 sec
 const REQUEST_TIMEOUT = configs.coinMarketCap?.timeoutMs || 30000;
 const BULK_CHUNK_SIZE = 1000;
 
@@ -132,27 +133,27 @@ async function fetchCMCPrice() {
 // ===============================
 // CRON JOB SETUP
 // ===============================
-// let jobInstance = null;
+let jobInstance = null;
 
-// exports.initializeJob = () => {
-//   if (jobInstance) {
-//     console.log("CMC job already running.");
-//     return jobInstance;
-//   }
-
-//   jobInstance = new CronJob(CRON_SCHEDULE, fetchCMCPrice, null, true);
-//   console.log(`Initialized CMC job with cron schedule: "${CRON_SCHEDULE}"`);
-//   return jobInstance;
-// };
-
-// exports.shutdownJob = async () => {
-//   if (jobInstance) {
-//     jobInstance.stop();
-//     console.log("CMC cron job stopped.");
-//     jobInstance = null;
-//   }
-// };
 exports.initializeJob = () => {
-  fetchCMCPrice();
-  // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+  if (jobInstance) {
+    console.log("CMC job already running.");
+    return jobInstance;
+  }
+
+  jobInstance = new CronJob(CRON_SCHEDULE, fetchCMCPrice, null, true);
+  console.log(`Initialized CMC job with cron schedule: "${CRON_SCHEDULE}"`);
+  return jobInstance;
 };
+
+exports.shutdownJob = async () => {
+  if (jobInstance) {
+    jobInstance.stop();
+    console.log("CMC cron job stopped.");
+    jobInstance = null;
+  }
+};
+// exports.initializeJob = () => {
+//   fetchCMCPrice();
+//   // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+// };

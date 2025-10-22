@@ -89,8 +89,7 @@ async function fetchTop100GainersAndLosers() {
 
 exports.initializeJob = () => {
   // Run once immediately
-  fetchTop100GainersAndLosers();
-
+  // fetchTop100GainersAndLosers();
   // Schedule to run daily at 00:05
-  // const job = new CronJob("5 0 * * *", fetchTop100GainersAndLosers, null, true);
+  const job = new CronJob("5 0 * * *", fetchTop100GainersAndLosers, null, true);
 };
