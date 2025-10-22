@@ -786,6 +786,7 @@ exports.addNewTokens = async (coins) => {
     const inserted = await CmcCoinsNew.insertMany(coins, {
       ordered: false, // skip duplicates instead of failing
     });
+    console.log(inserted, "inserted");
     return inserted;
   } catch (ex) {
     console.error("Error in addNewTokens:", ex.message);
@@ -1268,10 +1269,10 @@ exports.getNew = async (getTrendingDto, result = {}) => {
     };
 
     const [coins, count] = await Promise.all([
-      CoinsTrending.find(filter, {}, { sort: sortOptions })
+      CmcCoinsNew.find(filter, {}, { sort: sortOptions })
         .limit(limit)
         .skip((offset - 1) * limit),
-      CoinsTrending.countDocuments(filter),
+      CmcCoinsNew.countDocuments(filter),
     ]);
     const coinIds = coins.map((c) => c.coinId);
     const coinDetails = await CmcCoinsModel.find({

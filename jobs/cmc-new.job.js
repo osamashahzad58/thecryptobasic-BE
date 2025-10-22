@@ -18,7 +18,7 @@ async function fetchCMCNewTokens() {
     // 1. Fetch new listings
     const res = await axios.get(NEW_LISTINGS_URL, {
       headers,
-      params: { limit: 20 },
+      params: { limit: 200 },
     });
 
     const coins = res.data.data || [];
@@ -50,15 +50,15 @@ async function fetchCMCNewTokens() {
         slug: c.slug,
         change24hVol: quote.volume_change_24h || 0,
         change1h: quote.percent_change_1h || 0,
-        currentprice: quote.price || 0,
+        price: quote.price || 0,
         marketCapRank: c.cmc_rank || 0,
-        imageurl: info.logo || "",
+        logo: info.logo || "",
         sparklineUrl: `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${c.id}.svg`,
       };
     });
 
     if (formattedCoins.length > 0) {
-      console.log(formattedCoins.length, "formattedCoins.length");
+      console.log(formattedCoins, "formattedCoins.length");
       await coinsService.deleteNewTokens();
       await coinsService.addNewTokens(formattedCoins);
     }
@@ -72,7 +72,7 @@ async function fetchCMCNewTokens() {
 }
 
 exports.initializeJob = () => {
-  // fetchCMCNewTokens();
-  const job = new CronJob("10 * * * *", fetchCMCNewTokens, null, true);
-  job.start();
+  fetchCMCNewTokens();
+  // const job = new CronJob("10 * * * *", fetchCMCNewTokens, null, true);
+  // job.start();
 };

@@ -7,14 +7,15 @@ const cmcNewSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    symbol: {
-      type: String,
-      required: true,
-    },
     name: {
       type: String,
       required: true,
     },
+    symbol: {
+      type: String,
+      required: true,
+    },
+
     slug: {
       type: String,
       required: true,
@@ -27,7 +28,7 @@ const cmcNewSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    currentprice: {
+    price: {
       type: Number,
       required: true,
     },
@@ -35,7 +36,7 @@ const cmcNewSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    imageurl: {
+    logo: {
       type: String,
       required: true,
     },
