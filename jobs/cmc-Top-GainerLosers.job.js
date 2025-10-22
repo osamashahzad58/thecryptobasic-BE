@@ -39,8 +39,8 @@ async function fetchTop100GainersAndLosers() {
     );
 
     // Top 20 gainers/losers IDs for fetching logos
-    const topGainersIds = gainers.slice(0, 20).map((c) => c.id);
-    const topLosersIds = losers.slice(0, 20).map((c) => c.id);
+    const topGainersIds = gainers.slice(0, 500).map((c) => c.id);
+    const topLosersIds = losers.slice(0, 500).map((c) => c.id);
 
     const gainersInfo = await fetchCoinInfo(topGainersIds);
     const losersInfo = await fetchCoinInfo(topLosersIds);
@@ -50,34 +50,37 @@ async function fetchTop100GainersAndLosers() {
     await CmcTopLossers.deleteMany({});
 
     // Map gainers to your schema
-    const formattedGainers = gainers.slice(0, 20).map((coin) => ({
+    const formattedGainers = gainers.slice(0, 500).map((coin) => ({
       coinId: String(coin.id),
       symbol: coin.symbol,
       name: coin.name,
       slug: coin.slug,
       change24hVol: coin.quote.USD.volume_24h,
       change1h: coin.quote.USD.percent_change_1h,
-      currentprice: coin.quote.USD.price,
+      price: coin.quote.USD.price,
       marketCapRank: coin.cmc_rank,
       imageurl: gainersInfo[coin.id]?.logo || "",
     }));
     await CmcTopGainers.insertMany(formattedGainers);
 
     // Map losers to your schema
-    const formattedLosers = losers.slice(0, 20).map((coin) => ({
+    const formattedLosers = losers.slice(0, 500).map((coin) => ({
       coinId: String(coin.id),
       symbol: coin.symbol,
       name: coin.name,
       slug: coin.slug,
       change24hVol: coin.quote.USD.volume_24h,
       change1h: coin.quote.USD.percent_change_1h,
-      currentprice: coin.quote.USD.price,
+      price: coin.quote.USD.price,
       marketCapRank: coin.cmc_rank,
       imageurl: losersInfo[coin.id]?.logo || "",
     }));
     await CmcTopLossers.insertMany(formattedLosers);
 
-    console.log("Top 100 24h gainers & losers saved successfully.");
+    console.log(
+      "Top 100 24h gainers & losers saved successfully.",
+      formattedGainers
+    );
   } catch (err) {
     console.error("Error fetching top 100 coins:", err.message);
     if (err.response) console.error("CMC Response:", err.response.data);

@@ -18,7 +18,7 @@ async function fetchCMCTrending() {
     // 1. Fetch trending coins
     const res = await axios.get(TRENDING_URL, {
       headers,
-      params: { start: 1, limit: 200, time_period: "24h" },
+      params: { start: 1, limit: 500, time_period: "24h" },
     });
 
     const coins = res.data.data || [];

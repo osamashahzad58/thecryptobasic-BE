@@ -27,7 +27,7 @@ const cmcTopGainersSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    currentprice: {
+    price: {
       type: Number,
       required: true,
     },

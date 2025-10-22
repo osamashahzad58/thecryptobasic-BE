@@ -18,12 +18,11 @@ async function fetchCMCMostVisited() {
     // 1. Fetch most visited coins
     const res = await axios.get(MOST_VISITED_URL, {
       headers,
-      params: { start: 1, limit: 20, time_period: "24h" },
+      params: { start: 1, limit: 500, time_period: "24h" },
     });
 
     const coins = res.data.data || [];
     if (!coins.length) return;
-
     // Collect IDs
     const ids = coins.map((c) => c.id).join(",");
 
@@ -78,6 +77,6 @@ async function fetchCMCMostVisited() {
 }
 
 exports.initializeJob = () => {
-  // fetchCMCMostVisited();
-  const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+  fetchCMCMostVisited();
+  // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
 };
