@@ -10,7 +10,7 @@ const fetchDominanceChart = require("./cmc-dominance-chart");
 const cmcAddList = require("./cmc.add.coin.job");
 const fetchAltcoinSeason = require("./cmc-AltcoinSeason.job");
 const { initializeJob } = require("./coins-price-emitters");
-require("../jobs/cmc-post.job");
+// require("../jobs/cmc-post.job");
 
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
