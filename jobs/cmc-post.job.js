@@ -49,8 +49,9 @@ const CONFIG = {
     username: "YOUR_WP_USERNAME",
     password: "YOUR_WP_APP_PASSWORD",
     BEARER_TOKEN:
-      "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2NvaW5zdXBkYXRlLm9yZyIsImlhdCI6MTc2MDQyNzUyNiwibmJmIjoxNzYwNDI3NTI2LCJleHAiOjE3NjEwMzIzMjYsImRhdGEiOnsidXNlciI6eyJpZCI6IjIifX19.yOBmBfX5lCrHAjZrBSkgY4-MjufdovDLDUiYV6Dxiic",
+      "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2NvaW5zdXBkYXRlLm9yZyIsImlhdCI6MTc2MTE5ODgwMCwibmJmIjoxNzYxMTk4ODAwLCJleHAiOjE3NjE4MDM2MDAsImRhdGEiOnsidXNlciI6eyJpZCI6IjEifX19.mxNunxxQeh3xLjlp8TspDvwJsu0jd_InIkT3h4t_W6M",
   },
+
   dexscreener: {
     newListingsUrl: "https://api.dexscreener.com/token-profiles/latest/v1",
     pairUrl: "https://api.dexscreener.com/latest/dex/tokens/",
