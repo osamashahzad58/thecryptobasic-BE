@@ -3,6 +3,7 @@ const configs = require("../../configs");
 const { ObjectId } = require("mongodb");
 
 const CmcCoinsModel = require("./models/cmc-coins.model");
+const CmcCoinChartTS = require("../charts/charts.model");
 const CmcBtcSentimentModel = require("./models/cmc-BtcSentiment");
 const AltcoinCoinsModel = require("./models/cmc-Altcoin-Season");
 const CmcCoinsNew = require("./models/cmc-new.model");
@@ -661,63 +662,183 @@ exports.getSlug = async (getSlugDtoDto) => {
   }
   return result;
 };
-exports.chartbyId = async ({ id }) => {
+exports.chartbyId = async ({ id, interval = "ALL" }) => {
   const result = {};
-  try {
-    // Coin ke data lao
-    const dbData = await CmcCoinsModel.findOne(
-      { coinId: String(id) },
-      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
-    ).lean();
+  console.log("=== volumeChartbyId called ===");
+  console.log("Input params:", { id, interval });
 
-    if (!dbData || !dbData.chart) {
-      throw new Error(`No chart data found for ID: ${id}`);
+  try {
+    // === Validate input ===
+    if (!id) {
+      console.error("Missing coinId (id)");
+      throw new Error("coinId (id) is required");
     }
 
-    // chart ko filter karo -> sirf price, volume, timestamp rakho
-    const chart = dbData.chart.map((c) => ({
-      market_cap: c.market_cap,
-      volume: c.volume,
-      timestamp: c.timestamp,
-      // name: dbData.name,
-    }));
+    // === Interval → startDate mapping ===
+    const now = new Date();
+    let startDate;
+    console.log("Current date/time:", now);
 
+    switch (interval.toUpperCase()) {
+      case "1D":
+        startDate = new Date(now - 1 * 24 * 60 * 60 * 1000);
+        break;
+      case "7D":
+        startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "1M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case "3M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case "6M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        break;
+      case "1Y":
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      case "ALL":
+      default:
+        startDate = null;
+        break;
+    }
+
+    console.log("Computed startDate based on interval:", startDate);
+
+    // === Build query ===
+    const query = { coinId: String(id) };
+    if (startDate) query.timestamp = { $gte: startDate };
+    console.log("MongoDB query object:", query);
+
+    // === Fetch data ===
+    console.log("Fetching chart data from DB...");
+    const data = await CmcCoinChartTS.find(query)
+      .sort({ timestamp: 1 })
+      .select("timestamp market_cap volume -_id")
+      .lean();
+
+    console.log(`Fetched ${data.length} records from DB`);
+
+    if (!data.length) {
+      console.warn(`No chart data found for coinId: ${id}`);
+      throw new Error(`No chart data found for coinId: ${id}`);
+    }
+
+    // === Optional: compression for ALL interval ===
+    let chart = data;
+    if (interval.toUpperCase() === "ALL" && data.length > 2000) {
+      console.log("Data exceeds 2000 points, compressing...");
+      const step = Math.ceil(data.length / 1000);
+      console.log("Compression step size:", step);
+      chart = data.filter((_, idx) => idx % step === 0);
+      console.log(`Compressed chart length: ${chart.length}`);
+    }
+    console.log(chart.length);
+    // === Return result ===
     result.data = chart;
     result.message = "Chart data fetched successfully";
+    console.log("Chart data processed successfully");
   } catch (ex) {
-    console.error("Error response:", ex.message);
+    console.error("Error in volumeChartbyId:", ex.message);
     result.ex = ex.message;
   } finally {
+    console.log("=== volumeChartbyId finished ===");
+    console.log("Final result:");
     return result;
   }
 };
-exports.volumeChartbyId = async ({ id }) => {
+exports.volumeChartbyId = async ({ id, interval = "ALL" }) => {
   const result = {};
-  try {
-    // Coin ke data lao
-    const dbData = await CmcCoinsModel.findOne(
-      { coinId: String(id) },
-      { chart: 1, _id: 0, name: 1 } // sirf chart field chahiye
-    ).lean();
+  console.log("=== volumeChartbyId called ===");
+  console.log("Input params:", { id, interval });
 
-    if (!dbData || !dbData.chart) {
-      throw new Error(`No chart data found for ID: ${id}`);
+  try {
+    // === Validate input ===
+    if (!id) {
+      console.error("Missing coinId (id)");
+      throw new Error("coinId (id) is required");
     }
 
-    // chart ko filter karo -> sirf price, volume, timestamp rakho
-    const chart = dbData.chart.map((c) => ({
-      price: c.price,
-      volume: c.volume,
-      timestamp: c.timestamp,
-      // name: dbData.name,
-    }));
+    // === Interval → startDate mapping ===
+    const now = new Date();
+    let startDate;
+    console.log("Current date/time:", now);
 
+    switch (interval.toUpperCase()) {
+      case "1D":
+        startDate = new Date(now - 1 * 24 * 60 * 60 * 1000);
+        break;
+      case "7D":
+        startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "1M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case "3M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case "6M":
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        break;
+      case "1Y":
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      case "ALL":
+      default:
+        startDate = null;
+        break;
+    }
+
+    console.log("Computed startDate based on interval:", startDate);
+
+    // === Build query ===
+    const query = { coinId: String(id) };
+    if (startDate) query.timestamp = { $gte: startDate };
+    console.log("MongoDB query object:", query);
+
+    // === Fetch data ===
+    console.log("Fetching chart data from DB...");
+    const data = await CmcCoinChartTS.find(query)
+      .sort({ timestamp: 1 })
+      .select("timestamp price volume -_id")
+      .lean();
+
+    console.log(`Fetched ${data.length} records from DB`);
+
+    if (!data.length) {
+      console.warn(`No chart data found for coinId: ${id}`);
+      throw new Error(`No chart data found for coinId: ${id}`);
+    }
+
+    // === Optional: compression for ALL interval ===
+    let chart = data;
+    if (interval.toUpperCase() === "ALL" && data.length > 2000) {
+      console.log("Data exceeds 2000 points, compressing...");
+      const step = Math.ceil(data.length / 1000);
+      console.log("Compression step size:", step);
+      chart = data.filter((_, idx) => idx % step === 0);
+      console.log(`Compressed chart length: ${chart.length}`);
+    }
+    console.log(chart.length);
+    // === Return result ===
     result.data = chart;
     result.message = "Chart data fetched successfully";
+    console.log("Chart data processed successfully");
   } catch (ex) {
-    console.error("Error response:", ex.message);
+    console.error("Error in volumeChartbyId:", ex.message);
     result.ex = ex.message;
   } finally {
+    console.log("=== volumeChartbyId finished ===");
+    console.log("Final result:");
     return result;
   }
 };

@@ -68,6 +68,7 @@ module.exports = {
   getById: {
     query: Joi.object({
       id: Joi.string().trim().required(),
+      interval: Joi.string().trim().optional(),
     }),
   },
   getSlug: {
