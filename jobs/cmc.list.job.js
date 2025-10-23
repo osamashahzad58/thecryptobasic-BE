@@ -147,6 +147,7 @@ async function cmcList() {
                 coinId: coin.id.toString(),
                 logo: infoData[coin.id]?.logo || null,
                 symbol: coin.symbol,
+                description: coin.description,
                 name: coin.name,
                 slug:
                   coin.slug ||
@@ -203,6 +204,6 @@ async function cmcList() {
 exports.initializeJob = () => {
   cmcList(); // run immediately
 
-  new CronJob("10 * * * *", cmcList, null, true); // daily at midnight
+  // new CronJob("10 * * * *", cmcList, null, true); // daily at midnight
   // new CronJob("0 0 * * *", cmcList, null, true); // daily at midnight
 };

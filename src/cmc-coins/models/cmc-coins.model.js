@@ -10,6 +10,7 @@ const cmcCoinsSchema = new mongoose.Schema(
     logo: { type: String, default: null },
     symbol: { type: String, default: null },
     name: { type: String, default: null },
+    description: { type: String, default: null },
     slug: { type: String, default: null },
     cmcRank: { type: String, default: null },
     price: { type: String, default: null },

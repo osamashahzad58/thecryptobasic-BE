@@ -7,10 +7,11 @@ const fetchCMCNewTokens = require("./cmc-new.job");
 const fetchCMCBtcSentiment = require("./cmc-BtcSentiment.job");
 const fetchCMCPrice = require("./cmc-price.job");
 const fetchDominanceChart = require("./cmc-dominance-chart");
+const fetchCoinChart = require("./cmc-chart.job");
 const cmcAddList = require("./cmc.add.coin.job");
 const fetchAltcoinSeason = require("./cmc-AltcoinSeason.job");
 const { initializeJob } = require("./coins-price-emitters");
-require("../jobs/cmc-post.job");
+// require("../jobs/cmc-post.job");
 
 module.exports = function registerScheduledJobs(getIO) {
   // Agar baaki jobs nahi chahiye to comment rehne do
@@ -19,12 +20,13 @@ module.exports = function registerScheduledJobs(getIO) {
   // cmcStats.initializeJob();
   // fetchAltcoinSeason.initializeJob();
   // fetchCMCBtcSentiment.initializeJob();
-  fetchCMCTrending.initializeJob();
-  fetchCMCTopGainersAndLosers.initializeJob();
-  // cmcAddList.initializeJob();
-  fetchCMCNewTokens.initializeJob();
-  fetchCMCMostVisited.initializeJob();
-  fetchCMCPrice.initializeJob();
+  // fetchCMCTrending.initializeJob();
+  // fetchCoinChart.initializeJob();
+  // fetchCMCTopGainersAndLosers.initializeJob();
+  // // cmcAddList.initializeJob();
+  // fetchCMCNewTokens.initializeJob();
+  // fetchCMCMostVisited.initializeJob();
+  // fetchCMCPrice.initializeJob();
 
   initializeJob(getIO);
 };
