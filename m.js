@@ -23,7 +23,6 @@ function now() {
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// ---------- Database ----------
 const DATABASE_URI =
   process.env.DATABASE_URI ||
   "mongodb+srv://queckoinc:quecko321@cluster0.89cpk.mongodb.net/cryptobasic?retryWrites=true&w=majority";
