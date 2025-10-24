@@ -362,9 +362,7 @@ class DexScreenerWPBot {
 
     const content = `
 <!-- wp:paragraph {"className":"lead-intro"} -->
-<p class="lead-intro">
-  <strong>${name} (${symbol})</strong> is a newly listed <strong>crypto currency</strong> token on the ${chain.toUpperCase()} blockchain Contract:<span class="contract-address">${contractAddress}</span>, gaining growing attention across the DeFi and crypto news space. 
-</p>
+<p class="lead-intro">${contractAddress} — ${name} (${symbol}) is a newly listed <strong>cryptocurrency</strong> token on the ${chain.toUpperCase()} blockchain, gaining growing attention across the DeFi and crypto news space.</p>
 <!-- /wp:paragraph -->
 <!-- wp:paragraph {"className":"lead-intro"} -->
 <p class="lead-intro">
