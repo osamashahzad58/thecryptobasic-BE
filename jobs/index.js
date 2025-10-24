@@ -19,12 +19,12 @@ module.exports = function registerScheduledJobs(getIO) {
   // cmcStats.initializeJob();
   // fetchAltcoinSeason.initializeJob();
   // fetchCMCBtcSentiment.initializeJob();
-  fetchCMCTrending.initializeJob();
-  fetchCMCTopGainersAndLosers.initializeJob();
+  // fetchCMCTrending.initializeJob();
+  // fetchCMCTopGainersAndLosers.initializeJob();
   // cmcAddList.initializeJob();
-  fetchCMCNewTokens.initializeJob();
-  fetchCMCMostVisited.initializeJob();
-  fetchCMCPrice.initializeJob();
+  // fetchCMCNewTokens.initializeJob();
+  // fetchCMCMostVisited.initializeJob();
+  // fetchCMCPrice.initializeJob();
 
   initializeJob(getIO);
 };
