@@ -1,13 +1,15 @@
 const Joi = require("joi");
+Joi.objectId = require("joi-objectid")(Joi);
 
 module.exports = {
   create: {
     body: Joi.object({
-      userId: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required(),
+      // userId: Joi.string()
+      //   .pattern(/^[0-9a-fA-F]{24}$/)
+      //   .required(),
 
       coinId: Joi.string().trim().required(),
+      portfolioId: Joi.objectId().required(),
 
       type: Joi.string().valid("buy", "sell", "transfer").required(),
 
@@ -59,6 +61,47 @@ module.exports = {
         value.totalReceived = 0;
       }
       return value;
+    }),
+  },
+  allAsset: {
+    query: Joi.object({
+      offset: Joi.number().integer().required(),
+      limit: Joi.number().integer().required(),
+    }),
+  },
+  allAssetWithPortfolio: {
+    query: Joi.object({
+      offset: Joi.number().integer().required(),
+      limit: Joi.number().integer().required(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
+  stats: {
+    query: Joi.object({
+      timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
+    }),
+  },
+  chart: {
+    query: Joi.object({
+      timeFilter: Joi.number().integer().valid(1, 7, 30, 90).optional(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
+  deleteAsset: {
+    query: Joi.object({
+      coinId: Joi.string().trim().required(),
+      portfolioId: Joi.objectId().required(),
+    }),
+  },
+  update: {
+    body: Joi.object({
+      type: Joi.string().valid("buy", "sell", "transfer").optional(),
+      transferDirection: Joi.string().valid("in", "out").optional(),
+      transactionTime: Joi.date().optional(),
+      note: Joi.string().allow("").optional(),
+      quantity: Joi.number().positive().optional(),
+      fee: Joi.number().min(0).optional(),
+      pricePerCoin: Joi.number().min(0).optional(),
     }),
   },
 };

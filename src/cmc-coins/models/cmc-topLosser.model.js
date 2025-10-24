@@ -27,7 +27,7 @@ const cmcTopLossersSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    currentprice: {
+    price: {
       type: Number,
       required: true,
     },

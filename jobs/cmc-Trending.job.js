@@ -1,4 +1,5 @@
 const axios = require("axios");
+const CronJob = require("cron").CronJob; // <-- Add this line
 const configs = require("../configs");
 const coinsService = require("../src/cmc-coins/cmc-coins.service");
 
@@ -17,7 +18,7 @@ async function fetchCMCTrending() {
     // 1. Fetch trending coins
     const res = await axios.get(TRENDING_URL, {
       headers,
-      params: { start: 1, limit: 20 },
+      params: { start: 1, limit: 500, time_period: "24h" },
     });
 
     const coins = res.data.data || [];
@@ -77,6 +78,6 @@ async function fetchCMCTrending() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCTrending();
-  // const job = new CronJob("5 * * * *", fetchCMCTrending, null, true);
+  // fetchCMCTrending();
+  const job = new CronJob("15 * * * *", fetchCMCTrending, null, true);
 };

@@ -21,11 +21,11 @@ const cmcStatsSchema = new mongoose.Schema(
 
     // Fear & Greed Index fields (updated with historical data)
     fear_greed_now: { type: Number, default: 0 },
-    fear_greed_now_label: { type: String, default: "Unknown" },
+    fear_greed_now_label: { type: String, default: "Neutral" },
     fear_greed_yesterday: { type: Number, default: 0 },
-    fear_greed_yesterday_label: { type: String, default: "Unknown" },
+    fear_greed_yesterday_label: { type: String, default: "Neutral" },
     fear_greed_last_month: { type: Number, default: 0 },
-    fear_greed_last_month_label: { type: String, default: "Unknown" },
+    fear_greed_last_month_label: { type: String, default: "Neutral" },
 
     // Altcoin season fields
     altcoin_season: { type: Number, default: 0 },

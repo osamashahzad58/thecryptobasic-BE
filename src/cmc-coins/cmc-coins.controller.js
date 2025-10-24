@@ -71,10 +71,11 @@ exports.getPriceChart = async (req, res, next) => {
     next(ex);
   }
 };
-exports.getCompare = async (req, res, next) => {
+exports.getConverter = async (req, res, next) => {
   try {
-    const getCompareDto = { ...req.query };
-    const result = await cmcCoinsService.getCompare(getCompareDto);
+    const getConverterDto = { ...req.query };
+    console.log(getConverterDto, "getConverterDto");
+    const result = await cmcCoinsService.getConverter(getConverterDto);
 
     if (result.ex) throw result.ex;
     if (result.data.error)
@@ -82,6 +83,24 @@ exports.getCompare = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Currency Price Chart",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getPopularConversions = async (req, res, next) => {
+  try {
+    const getDto = { ...req.query };
+    console.log(getDto, "getDto");
+    const result = await cmcCoinsService.getPopularConversions(getDto);
+
+    if (result.ex) throw result.ex;
+    if (result.data.error)
+      throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Popular Conversions",
       data: result.data,
     });
   } catch (ex) {
@@ -152,6 +171,64 @@ exports.getById = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getSlug = async (req, res, next) => {
+  try {
+    const getSlugDto = { ...req.query };
+    const result = await cmcCoinsService.getSlug(getSlugDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin detail",
+      data: {
+        pricePerformance: result.pricePerformance,
+        stats: result.details,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.chartbyId = async (req, res, next) => {
+  try {
+    const chartbyIdDto = { ...req.query };
+    const result = await cmcCoinsService.chartbyId(chartbyIdDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin chart data",
+      data: {
+        stats: result.data,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.volumeChartbyId = async (req, res, next) => {
+  try {
+    const chartbyIdDto = { ...req.query };
+    const result = await cmcCoinsService.volumeChartbyId(chartbyIdDto);
+
+    if (result.ex) throw result.ex;
+    // if (result.error)
+    //   throw createError(StatusCodes.BAD_REQUEST, result.data.error.message);
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "coin chart data",
+      data: {
+        stats: result.data,
+      },
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getCoinByIdWithCMC = async (req, res, next) => {
   try {
     const getCoinByIdWithCMCDto = { ...req.query };
@@ -174,7 +251,10 @@ exports.getCoinByIdWithCMC = async (req, res, next) => {
 };
 exports.getAllCrypto = async (req, res, next) => {
   try {
-    const getAllCryptoDto = req.query;
+    const getAllCryptoDto = {
+      ...req.query,
+    };
+
     const result = await cmcCoinsService.getAllCrypto(getAllCryptoDto);
 
     if (result.ex) throw result.ex;
@@ -182,6 +262,90 @@ exports.getAllCrypto = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Get All Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTopGainersWithData = async (req, res, next) => {
+  try {
+    const getTopGainersDto = req.query;
+    const result = await cmcCoinsService.getTopGainersWithData(
+      getTopGainersDto
+    );
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getAltCoin = async (req, res, next) => {
+  try {
+    const getAltCoinDto = req.query;
+    const result = await cmcCoinsService.getAltCoin(getAltCoinDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get altcoin-season Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTrendingWithData = async (req, res, next) => {
+  try {
+    const getTopGainersDto = req.query;
+    const result = await cmcCoinsService.getTrendingWithData(getTopGainersDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getTopLossersWithData = async (req, res, next) => {
+  try {
+    const getTopGainersDto = req.query;
+    const result = await cmcCoinsService.getTopLossersWithData(
+      getTopGainersDto
+    );
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get Top Gainers Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getSkipCoinId = async (req, res, next) => {
+  try {
+    const getSkipCoinIdDto = { ...req.query };
+    const result = await cmcCoinsService.getSkipCoinId(getSkipCoinIdDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get All Crypto Data",
       data: result.data,
     });
   } catch (ex) {
@@ -236,6 +400,38 @@ exports.getTrending = async (req, res, next) => {
     next(ex);
   }
 };
+exports.getNew = async (req, res, next) => {
+  try {
+    const getTrendingDto = req.query;
+    const result = await cmcCoinsService.getNew(getTrendingDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get New Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getExploreNew = async (req, res, next) => {
+  try {
+    const getTrendingDto = req.query;
+    const result = await cmcCoinsService.getExploreNew(getTrendingDto);
+
+    if (result.ex) throw result.ex;
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Get New Crypto",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
 exports.getSearch = async (req, res, next) => {
   try {
     const getSearchDto = req.query;
@@ -284,6 +480,30 @@ exports.getTopstats = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       message: "Get stats successfully",
+      data: result.data,
+    });
+  } catch (ex) {
+    next(ex);
+  }
+};
+exports.getCompare = async (req, res, next) => {
+  try {
+    // Accept both ?coinIds[]=1&coinIds[]=1027 or ?coinIds=1,1027
+    const coinIds = Array.isArray(req.query.coinIds)
+      ? req.query.coinIds
+      : req.query.coinIds?.split(",") || [];
+
+    const getCompareDto = { coinIds };
+
+    const result = await cmcCoinsService.getCompare(getCompareDto);
+
+    if (result.ex) throw result.ex;
+    if (result.error)
+      throw createError(StatusCodes.BAD_REQUEST, result.message);
+
+    res.status(StatusCodes.OK).json({
+      statusCode: StatusCodes.OK,
+      message: "Coins compared successfully",
       data: result.data,
     });
   } catch (ex) {

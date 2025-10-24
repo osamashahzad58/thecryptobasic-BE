@@ -1,6 +1,7 @@
 const axios = require("axios");
 const configs = require("../configs");
 const coinsService = require("../src/cmc-coins/cmc-coins.service");
+const CronJob = require("cron").CronJob; // <-- Add this line
 
 const MOST_VISITED_URL =
   "https://pro-api.coinmarketcap.com/v1/cryptocurrency/trending/most-visited";
@@ -17,12 +18,11 @@ async function fetchCMCMostVisited() {
     // 1. Fetch most visited coins
     const res = await axios.get(MOST_VISITED_URL, {
       headers,
-      params: { start: 1, limit: 20, time_period: "24h" },
+      params: { start: 1, limit: 100, time_period: "24h" },
     });
 
     const coins = res.data.data || [];
     if (!coins.length) return;
-
     // Collect IDs
     const ids = coins.map((c) => c.id).join(",");
 
@@ -57,7 +57,6 @@ async function fetchCMCMostVisited() {
         currentprice: quote.price,
         imageurl: info.logo,
         marketCapRank: c.cmc_rank,
-        trafficScore: c.traffic_score,
         sparklineUrl: sparklineUrl,
         timestamp: new Date(),
       });
@@ -77,6 +76,6 @@ async function fetchCMCMostVisited() {
 }
 
 exports.initializeJob = () => {
-  fetchCMCMostVisited();
-  // const job = new CronJob("5 * * * *", fetchCMCMostVisited, null, true);
+  // fetchCMCMostVisited();
+  const job = new CronJob("15 * * * *", fetchCMCMostVisited, null, true);
 };

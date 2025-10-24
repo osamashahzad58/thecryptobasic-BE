@@ -3,95 +3,14 @@ const axios = require("axios");
 const configs = require("../configs");
 const CmcCoins = require("../src/cmc-coins/models/cmc-coins.model");
 
-// Fetch 24h highs/lows from OHLCV (hourly)
-async function get24hHighLow(coinId) {
-  try {
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24h ago
+const BATCH_SIZE = 20; // reduced to avoid rate limit
+const REQUEST_DELAY = 300; // 300ms delay between coin requests
 
-    const res = await axios.get(
-      "https://pro-api.coinmarketcap.com/v1/cryptocurrency/ohlcv/historical",
-      {
-        params: {
-          id: coinId,
-          convert: "USD",
-          time_start: yesterday.toISOString(), // full ISO timestamp
-          time_end: now.toISOString(),
-          interval: "hourly",
-        },
-        headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
-      }
-    );
+// Helper delay function
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-    const candles = (res.data && res.data.data && res.data.data.quotes) || [];
-    if (!candles.length) {
-      console.warn(`No hourly candles returned for coinId=${coinId}`);
-      // log raw response for debugging (optional)
-      if (res.data)
-        console.debug(
-          "OHLCV response:",
-          JSON.stringify(res.data).slice(0, 1000)
-        );
-      return { high_24h: null, low_24h: null };
-    }
-
-    const highs = candles
-      .map((c) => c.quote.USD.high)
-      .filter((v) => typeof v === "number");
-    const lows = candles
-      .map((c) => c.quote.USD.low)
-      .filter((v) => typeof v === "number");
-
-    if (!highs.length || !lows.length) {
-      console.warn(
-        `Hourly candles exist but contain no numeric highs/lows for coinId=${coinId}`
-      );
-      return { high_24h: null, low_24h: null };
-    }
-
-    return {
-      high_24h: Math.max(...highs),
-      low_24h: Math.min(...lows),
-    };
-  } catch (err) {
-    console.error(
-      `Error fetching 24h OHLCV for coinId=${coinId}:`,
-      err.message
-    );
-    if (err.response) console.error("API error:", err.response.data);
-    return { high_24h: null, low_24h: null };
-  }
-}
-
-// Fallback: compute 24h high/low from DB chart entries if API hourly is empty
-async function get24hFromDbFallback(coinId) {
-  try {
-    const doc = await CmcCoins.findOne({ coinId: coinId.toString() }).lean();
-    if (!doc || !Array.isArray(doc.chart) || !doc.chart.length) return null;
-
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const last24 = doc.chart.filter(
-      (c) => new Date(c.timestamp) >= since && typeof c.price === "number"
-    );
-
-    if (!last24.length) return null;
-
-    const prices = last24.map((c) => c.price);
-    return {
-      high_24h: Math.max(...prices),
-      low_24h: Math.min(...prices),
-    };
-  } catch (err) {
-    console.error(
-      `Error computing 24h fallback from DB for coinId=${coinId}:`,
-      err.message
-    );
-    return null;
-  }
-}
-
-// Fetch highs/lows from OHLCV (last 30 days) - unchanged
-async function getHighLows(coinId) {
+// Fetch OHLCV historical data (24h + 30d)
+async function getOHLCV(coinId) {
   try {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -104,156 +23,174 @@ async function getHighLows(coinId) {
           convert: "USD",
           time_start: thirtyDaysAgo.toISOString().split("T")[0],
           time_end: now.toISOString().split("T")[0],
-          interval: "daily",
+          interval: "hourly",
         },
         headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
       }
     );
 
-    const candles = (res.data && res.data.data && res.data.data.quotes) || [];
-    if (!candles.length)
-      return { monthHigh: null, monthLow: null, ath: null, atl: null };
+    const candles = res.data?.data?.quotes || [];
+    const highs = candles.map((c) => c.quote.USD.high).filter(Number.isFinite);
+    const lows = candles.map((c) => c.quote.USD.low).filter(Number.isFinite);
 
-    const highs = candles
+    const last24hCandles = candles.slice(-24); // last 24 hours (hourly)
+
+    const highs24h = last24hCandles
       .map((c) => c.quote.USD.high)
-      .filter((v) => typeof v === "number");
-    const lows = candles
+      .filter(Number.isFinite);
+    const lows24h = last24hCandles
       .map((c) => c.quote.USD.low)
-      .filter((v) => typeof v === "number");
-
-    if (!highs.length || !lows.length)
-      return { monthHigh: null, monthLow: null, ath: null, atl: null };
+      .filter(Number.isFinite);
 
     return {
-      monthHigh: Math.max(...highs),
-      monthLow: Math.min(...lows),
-      ath: Math.max(...highs), // ideally fetch full history for true ATH
-      atl: Math.min(...lows),
+      monthHigh: highs.length ? Math.max(...highs) : null,
+      monthLow: lows.length ? Math.min(...lows) : null,
+      high_24h: highs24h.length ? Math.max(...highs24h) : null,
+      low_24h: lows24h.length ? Math.min(...lows24h) : null,
+      ath: highs.length ? Math.max(...highs) : null,
+      atl: lows.length ? Math.min(...lows) : null,
     };
   } catch (err) {
-    console.error(
-      `Error fetching 30d OHLCV for coinId=${coinId}:`,
-      err.message
-    );
-    if (err.response) console.error("API error:", err.response.data);
-    return { monthHigh: null, monthLow: null, ath: null, atl: null };
+    return {
+      monthHigh: null,
+      monthLow: null,
+      high_24h: null,
+      low_24h: null,
+      ath: null,
+      atl: null,
+    };
   }
 }
 
+// Fetch market pairs
+async function getMarkets(coinId) {
+  try {
+    const res = await axios.get(
+      "https://pro-api.coinmarketcap.com/v1/cryptocurrency/market-pairs/latest",
+      {
+        params: { id: coinId, convert: "USD" },
+        headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
+      }
+    );
+    return res.data?.data?.market_pairs || [];
+  } catch {
+    return [];
+  }
+}
+
+// Fetch listings batch
+async function fetchListingsBatch(start = 1) {
+  const res = await axios.get(
+    "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
+    {
+      params: {
+        start: start.toString(),
+        limit: BATCH_SIZE.toString(),
+        convert: "USD",
+      },
+      headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
+    }
+  );
+  return res.data?.data || [];
+}
+
+// Main job
 async function cmcList() {
   try {
     console.log("--- Fetching CMC Data ---");
+    let start = 1;
+    let more = true;
 
-    // 1. Get listings (price, market data)
-    const listingsRes = await axios.get(
-      "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
-      {
-        params: { start: "1", limit: "3", convert: "USD" },
-        headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
-      }
-    );
-    const coins = listingsRes.data.data;
+    while (more) {
+      const coins = await fetchListingsBatch(start);
+      if (!coins.length) break;
 
-    // IDs list
-    const ids = coins.map((c) => c.id).join(",");
-
-    // 2. Get coin info (logo, socials)
-    const infoRes = await axios.get(
-      "https://pro-api.coinmarketcap.com/v1/cryptocurrency/info",
-      {
-        params: { id: ids },
-        headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
-      }
-    );
-    const infoData = infoRes.data.data;
-
-    for (const coin of coins) {
-      const sparklineUrl = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
-
-      // Snapshot for chart
-      const todayData = {
-        timestamp: new Date(),
-        price: coin.quote && coin.quote.USD ? coin.quote.USD.price : null,
-        market_cap:
-          coin.quote && coin.quote.USD ? coin.quote.USD.market_cap : null,
-        volume: coin.quote && coin.quote.USD ? coin.quote.USD.volume_24h : null,
-      };
-
-      // 3. Get highs/lows from OHLCV (30d)
-      const { monthHigh, monthLow, ath, atl } = await getHighLows(coin.id);
-
-      // 4. Try to get 24h high/low from OHLCV hourly
-      let { high_24h, low_24h } = await get24hHighLow(coin.id);
-
-      // If hourly API returned nulls, fallback to DB computed last-24h values
-      if (high_24h == null || low_24h == null) {
-        const fallback = await get24hFromDbFallback(coin.id);
-        if (fallback) {
-          high_24h = fallback.high_24h;
-          low_24h = fallback.low_24h;
-          console.log(
-            `Used DB fallback 24h for ${coin.symbol}: high=${high_24h}, low=${low_24h}`
-          );
-        } else {
-          console.warn(
-            `No 24h data available for ${coin.symbol} (${coin.id}) from API or DB fallback.`
-          );
+      const ids = coins.map((c) => c.id).join(",");
+      const infoRes = await axios.get(
+        "https://pro-api.coinmarketcap.com/v1/cryptocurrency/info",
+        {
+          params: { id: ids },
+          headers: { "X-CMC_PRO_API_KEY": configs.coinMarketCap.apiKey },
         }
-      } else {
-        console.log(
-          `Used OHLCV hourly for ${coin.symbol}: high=${high_24h}, low=${low_24h}`
-        );
-      }
-
-      let contracts = [];
-      if (infoData[coin.id]?.contract_address?.length) {
-        contracts = infoData[coin.id].contract_address.map((c) => ({
-          platform: c.platform?.name || null,
-          symbol: c.platform?.symbol || null,
-          contract: c.contract_address || null,
-        }));
-      }
-
-      // Final payload
-      const payload = {
-        coinId: coin.id.toString(),
-        logo: infoData[coin.id]?.logo || null,
-        symbol: coin.symbol,
-        name: coin.name,
-        slug: coin.slug || infoData[coin.id]?.slug || coin.symbol.toLowerCase(),
-        cmcRank: coin.cmc_rank?.toString(),
-
-        price: todayData.price != null ? todayData.price.toString() : null,
-        volume_24h:
-          todayData.volume != null ? todayData.volume.toString() : null,
-        percent_change_1h: coin.quote?.USD?.percent_change_1h?.toString(),
-        percent_change_24h: coin.quote?.USD?.percent_change_24h?.toString(),
-        percent_change_7d: coin.quote?.USD?.percent_change_7d?.toString(),
-        market_cap:
-          todayData.market_cap != null ? todayData.market_cap.toString() : null,
-
-        categories: infoData[coin.id]?.tags || [],
-        website: infoData[coin.id]?.urls?.website || [],
-        sparkline_7d: sparklineUrl,
-
-        high_24h: high_24h || null,
-        low_24h: low_24h || null,
-
-        all_time_high: ath,
-        all_time_low: atl,
-        month_high: monthHigh,
-        month_low: monthLow,
-        contracts: contracts,
-      };
-
-      // Save / update in DB (push today's snapshot)
-      await CmcCoins.findOneAndUpdate(
-        { coinId: coin.id.toString() },
-        { $set: payload, $push: { chart: todayData } },
-        { upsert: true, new: true }
       );
+      const infoData = infoRes.data?.data || {};
 
-      console.log(`Saved ${coin.name} (${coin.symbol})`);
+      for (const coin of coins) {
+        const marketCap = coin.quote?.USD?.market_cap || null;
+        const percentChange24h = coin.quote?.USD?.percent_change_24h || null;
+
+        const marketCapChange24h =
+          marketCap && percentChange24h !== null
+            ? marketCap * (percentChange24h / 100)
+            : null;
+
+        const todayData = {
+          timestamp: new Date(),
+          price: coin.quote?.USD?.price || null,
+          market_cap: marketCap,
+          market_cap_change_24h: marketCapChange24h,
+          volume: coin.quote?.USD?.volume_24h || null,
+        };
+        const { monthHigh, monthLow, high_24h, low_24h, ath, atl } =
+          await getOHLCV(coin.id);
+        const markets = await getMarkets(coin.id);
+        console.log(markets, "markets");
+
+        const wallets = infoData[coin.id]?.urls?.wallet || [];
+        const audits = infoData[coin.id]?.audit_info_list || [];
+
+        const update = {
+          updateOne: {
+            filter: { coinId: coin.id.toString() },
+            update: {
+              $set: {
+                coinId: coin.id.toString(),
+                logo: infoData[coin.id]?.logo || null,
+                symbol: coin.symbol,
+                name: coin.name,
+                slug:
+                  coin.slug ||
+                  infoData[coin.id]?.slug ||
+                  coin.symbol.toLowerCase(),
+                cmcRank: coin.cmc_rank?.toString(),
+                price: todayData.price,
+                volume_24h: todayData.volume,
+                percent_change_1h: coin.quote?.USD?.percent_change_1h,
+                percent_change_24h: coin.quote?.USD?.percent_change_24h,
+                percent_change_7d: coin.quote?.USD?.percent_change_7d,
+                market_cap: todayData.market_cap,
+                market_cap_change_24h: todayData.market_cap_change_24h,
+                categories: infoData[coin.id]?.tags || [],
+                website: infoData[coin.id]?.urls?.website || [],
+                wallets,
+                audits,
+                high_24h,
+                low_24h,
+                all_time_high: ath,
+                all_time_low: atl,
+                month_high: monthHigh,
+                month_low: monthLow,
+                contracts:
+                  infoData[coin.id]?.contract_address?.map((c) => ({
+                    platform: c.platform?.name || null,
+                    symbol: c.platform?.symbol || null,
+                    contract: c.contract_address || null,
+                  })) || [],
+                markets,
+              },
+              $push: { chart: todayData },
+            },
+            upsert: true,
+          },
+        };
+
+        await CmcCoins.bulkWrite([update]);
+        await delay(REQUEST_DELAY);
+      }
+
+      console.log(`Saved batch starting at ${start}`);
+      start += BATCH_SIZE;
+      if (coins.length < BATCH_SIZE) more = false;
     }
 
     console.log("--- Done ---");
@@ -264,9 +201,8 @@ async function cmcList() {
 }
 
 exports.initializeJob = () => {
-  // Run immediately once
-  cmcList();
+  cmcList(); // run immediately
 
-  // Schedule daily run at midnight
-  new CronJob("0 0 * * *", cmcList, null, true);
+  new CronJob("10 * * * *", cmcList, null, true); // daily at midnight
+  // new CronJob("0 0 * * *", cmcList, null, true); // daily at midnight
 };

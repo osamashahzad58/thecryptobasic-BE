@@ -14,10 +14,16 @@ const sendEmailVerificationCode = async (confirmEmailPayload) => {
     if (result.ex) throw result.ex;
   } catch (ex) {}
 };
-
+const sendPasswordResetEmail = async (passwordResetDto) => {
+  try {
+    const result = await emailUtil.sendPasswordResetEmail(passwordResetDto);
+    if (result.ex) throw result.ex;
+  } catch (ex) {}
+};
 exports.registerListeners = () => {
   eventEmitter.on(
     USER_EVENTS.EMAIL_VERIFICATION_EVENTS,
     sendEmailVerificationCode
   );
+  eventEmitter.on(USER_EVENTS.FORGOT_PASSWORD, sendPasswordResetEmail);
 };
